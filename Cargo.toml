@@ -10,4 +10,4 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 three-d = { version = "0.16.4", features = ["window"] }
-
+rand = "0.8.5"
