@@ -4,6 +4,8 @@ pkgs.mkShell {
   buildInputs = [
     pkgs.rustc
     pkgs.cargo
+    pkgs.rustfmt
+    pkgs.clippy
     pkgs.xorg.libX11
     pkgs.xorg.libXrandr
     pkgs.xorg.libXcursor
