@@ -13,7 +13,7 @@ struct Particle {
 }
 
 impl Particle {
-    pub fn new(context: &Context, position: Vector3<f32>, color: Srgba) -> Self {
+    pub fn new(context: &Context, position: Vector3<f32>, mass: f32, color: Srgba) -> Self {
         let mut sphere = Gm::new(
             Mesh::new(context, &CpuMesh::sphere(16)),
             PhysicalMaterial::new_transparent(
@@ -30,7 +30,7 @@ impl Particle {
         Self {
             position: position,
             velocity: vec3(0.0, 0.0, 0.0),
-            mass: 1.0,
+            mass,
             sphere,
         }
     }
@@ -54,11 +54,12 @@ pub fn main() {
         0.1,
         1000.0,
     );
-    let mut control = OrbitControl::new(*camera.target(), 1.0, 100.0);
+    let mut control = OrbitControl::new(*camera.target(), 1.0, 1000.0);
 
-    let mut red_particles = initialize_particles(&context, Srgba::RED, 2);
-    let mut green_particles = initialize_particles(&context, Srgba::GREEN, 2);
-    let mut blue_particles = initialize_particles(&context, Srgba::BLUE, 2);
+    let amount = 100;
+    let mut red_particles = initialize_particles(&context, 1.0, Srgba::RED, amount);
+    let mut green_particles = initialize_particles(&context, 1.5, Srgba::GREEN, amount);
+    let mut blue_particles = initialize_particles(&context, 2.0, Srgba::BLUE, amount);
 
     let light0 = DirectionalLight::new(&context, 1.0, Srgba::WHITE, &vec3(0.0, -0.5, -0.5));
     let light1 = DirectionalLight::new(&context, 1.0, Srgba::WHITE, &vec3(0.0, 0.5, 0.5));
@@ -67,13 +68,12 @@ pub fn main() {
         camera.set_viewport(frame_input.viewport);
         control.handle_events(&mut camera, &mut frame_input.events);
 
-        let time = (frame_input.accumulated_time * 0.001) as f32;
-        rule(&mut red_particles, &green_particles, -1.0, time);
-        rule(&mut green_particles, &red_particles, -1.0, time);
-        rule(&mut blue_particles, &red_particles, -1.0, time);
-        rule(&mut red_particles, &blue_particles, -1.0, time);
-        rule(&mut blue_particles, &green_particles, -1.0, time);
-        rule(&mut green_particles, &blue_particles, -1.0, time);
+        apply_bidirectional_gravity_rule(&mut red_particles, &mut green_particles, 1.0);
+        apply_bidirectional_gravity_rule(&mut red_particles, &mut blue_particles, 1.0);
+        apply_bidirectional_gravity_rule(&mut blue_particles, &mut green_particles, 1.0);
+        bidirectional_gravity_rule(&mut red_particles, &red_particles, 1.0);
+        bidirectional_gravity_rule(&mut blue_particles, &blue_particles, 1.0);
+        bidirectional_gravity_rule(&mut green_particles, &green_particles, 1.0);
 
         let spheres = red_particles
             .iter()
@@ -91,7 +91,7 @@ pub fn main() {
     });
 }
 
-fn initialize_particles(context: &Context, color: Srgba, amount: usize) -> Vec<Particle> {
+fn initialize_particles(context: &Context, mass: f32, color: Srgba, amount: usize) -> Vec<Particle> {
     let mut particles = Vec::new();
     for _ in 0..amount {
         let factor = 20.0;
@@ -99,70 +99,71 @@ fn initialize_particles(context: &Context, color: Srgba, amount: usize) -> Vec<P
         let y = rand::random::<f32>() * factor;
         let z = rand::random::<f32>() * factor;
 
-        particles.push(Particle::new(context, vec3(x, y, z), color));
+        particles.push(Particle::new(context, vec3(x, y, z), mass, color));
     }
     particles
 }
 
-fn rule(
+fn apply_bidirectional_gravity_rule(
+    particles_0: &mut Vec<Particle>,
+    particles_1: &mut Vec<Particle>,
+    g: f32,
+) {
+    
+    bidirectional_gravity_rule(particles_0, particles_1, g);
+    bidirectional_gravity_rule(particles_1, particles_0, g);
+}
+
+fn bidirectional_gravity_rule(
     affected_particles: &mut Vec<Particle>,
     acting_particles: &Vec<Particle>,
     g: f32,
-    time: f32,
 ) {
     for affected_particle in affected_particles {
-        let mut force = vec3(0.0, 0.0, 0.0);
-
-        for acting_particles in acting_particles {
-            let distance = affected_particle.position - acting_particles.position;
-            let distance_squared = distance.dot(distance);
-            if distance_squared > 0.0001 {
-                let force_magnitude = g / distance_squared;
-                force += distance * force_magnitude;
-            }
-
-            affected_particle.velocity = affected_particle.velocity + force;
-                        let border = 10.0;
-
-            if affected_particle.position.x > border || affected_particle.position.x < -border {
-                affected_particle.velocity.x = affected_particle.velocity.x * -1.0;
-            }
-
-            if affected_particle.position.y > border || affected_particle.position.y < -border {
-                affected_particle.velocity.y = affected_particle.velocity.y * -1.0;
-            }
-
-            if affected_particle.position.z > border || affected_particle.position.z < -border {
-                affected_particle.velocity.z = affected_particle.velocity.z * -1.0;
-            }
-
-            let mut new_position = affected_particle.position + affected_particle.velocity * time;
-            
-            if new_position.x > border {
-                new_position.x = border;
-            }
-            if new_position.x < -border {
-                new_position.x = -border;
-            }
-            if new_position.y > border {
-                new_position.y = border;
-            }
-            if new_position.y < -border {
-                new_position.y = -border;
-            }
-            if new_position.z > border {
-                new_position.z = border;
-            }
-            if new_position.z < -border {
-                new_position.z = -border;
-            }
-
-            affected_particle.position = new_position;
-            affected_particle
-                .sphere
-                .set_transformation(Mat4::from_translation(affected_particle.position));
-
-
+        for acting_particle in acting_particles {
+           gravity_rule(affected_particle, acting_particle, g); 
         }
     }
+}
+
+fn unidirectional_gravity_rule(particles: &mut Vec<Particle>, g: f32) {
+    for i in 0..particles.len() {
+        for j in 0..particles.len() {
+            if i != j {
+                gravity_rule(&mut particles[i], &particles[j], g);
+            }
+        }
+    }
+}
+
+fn gravity_rule(particle_0: &mut Particle, particle_1: &Particle, g: f32) {
+    let border = 100.0;
+    let throttle = 0.005;
+
+    let distance = particle_0.position - particle_1.position;
+    let distance_squared = distance.dot(distance);
+    let mut directed_acceleration = vec3(0.0, 0.0, 0.0);
+    if distance_squared > 0.0001 {
+        let acceleration = g * particle_1.mass / distance_squared;
+        directed_acceleration = distance.normalize() * acceleration * throttle;
+    }
+
+    particle_0.velocity = particle_0.velocity + directed_acceleration;
+
+    if particle_0.position.x.abs() > border {
+       particle_0.velocity.x *= -1.0;
+    }
+
+    if particle_0.position.y.abs() > border {
+       particle_0.velocity.y *= -1.0;
+    }
+
+    if particle_0.position.z.abs() > border {
+       particle_0.velocity.z *= -1.0;
+    }
+
+    particle_0.position = particle_0.position + particle_0.velocity;
+    particle_0 
+        .sphere
+        .set_transformation(Mat4::from_translation(particle_0.position));
 }
