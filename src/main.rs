@@ -4,14 +4,12 @@ use three_d::{
     Window, WindowSettings,
 };
 
-
 struct Particle {
     position: Vector3<f32>,
     velocity: Vector3<f32>,
     mass: f32,
     sphere: Gm<Mesh, PhysicalMaterial>,
 }
-
 
 impl Particle {
     pub fn new(context: &Context, border: f32, mass: f32, color: Srgba) -> Self {
@@ -43,7 +41,12 @@ impl Particle {
         }
     }
 
-    pub fn update_velocity(&mut self, other_position: Vector3<f32>, other_mass: f32, gravity_constant: f32) {
+    pub fn update_velocity(
+        &mut self,
+        other_position: Vector3<f32>,
+        other_mass: f32,
+        gravity_constant: f32,
+    ) {
         let distance = self.position - other_position;
         let distance_squared = distance.dot(distance);
         let mut directed_acceleration = vec3(0.0, 0.0, 0.0);
@@ -53,7 +56,6 @@ impl Particle {
         }
 
         self.velocity += directed_acceleration;
-
     }
 
     pub fn update_position(&mut self, time_step: f32) {
@@ -92,7 +94,7 @@ pub fn main() {
 
     let mut red_particles = initialize_particles(&context, border, 3.0, Srgba::RED, amount);
     let mut green_particles = initialize_particles(&context, border, 250.0, Srgba::GREEN, amount);
-    let mut blue_particles = initialize_particles(&context, border,  10000.0, Srgba::BLUE, 10);
+    let mut blue_particles = initialize_particles(&context, border, 10000.0, Srgba::BLUE, 10);
 
     let light0 = DirectionalLight::new(&context, 1.0, Srgba::WHITE, &vec3(0.0, -0.5, -0.5));
     let light1 = DirectionalLight::new(&context, 1.0, Srgba::WHITE, &vec3(0.0, 0.5, 0.5));
@@ -103,17 +105,21 @@ pub fn main() {
 
         apply_mutual_gravity_rule(&mut red_particles, &mut green_particles, -1.0);
         apply_mutual_gravity_rule(&mut red_particles, &mut blue_particles, -1.0);
-        apply_mutual_gravity_rule(&mut blue_particles, &mut green_particles,-1.0);
+        apply_mutual_gravity_rule(&mut blue_particles, &mut green_particles, -1.0);
         apply_identity_gravity_rule(&mut red_particles, -1.0);
-        apply_identity_gravity_rule(&mut blue_particles,-1.0);
-        apply_identity_gravity_rule(&mut green_particles,-1.0);
+        apply_identity_gravity_rule(&mut blue_particles, -1.0);
+        apply_identity_gravity_rule(&mut green_particles, -1.0);
 
-        for particle in red_particles.iter_mut().chain(green_particles.iter_mut()).chain(blue_particles.iter_mut()) {
+        for particle in red_particles
+            .iter_mut()
+            .chain(green_particles.iter_mut())
+            .chain(blue_particles.iter_mut())
+        {
             particle.apply_friction(0.005);
             particle.update_position(0.01);
 
             // apply spherical border collision
-            let distance_from_center = particle.position.magnitude(); 
+            let distance_from_center = particle.position.magnitude();
 
             if distance_from_center.abs() > border {
                 particle.velocity = -particle.velocity;
