@@ -10,4 +10,10 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 three-d = { version = "0.16.4", features = ["window"] }
-rand = "0.8.5"
+log = "0.4.21"
+rand = "=0.8.5"
+getrandom = { version = "0.2.12", features = ["js"] }
+wasm-bindgen = "0.2.91"
+wasm-bindgen-futures = "0.4"
+console_error_panic_hook = "0.1"
+console_log = "1"

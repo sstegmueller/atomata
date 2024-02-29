@@ -63,7 +63,7 @@ impl Particle {
     }
 
     pub fn apply_friction(&mut self, friction: f32) {
-        self.velocity *= (1.0 - friction);
+        self.velocity *= 1.0 - friction;
     }
 }
 
