@@ -9,7 +9,7 @@ edition = "2021"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-three-d = { version = "0.16.4", features = ["window"] }
+three-d = { version = "0.16.4", features = ["window", "egui-gui"] }
 log = "0.4.21"
 rand = "=0.8.5"
 getrandom = { version = "0.2.12", features = ["js"] }

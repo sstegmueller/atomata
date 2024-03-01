@@ -2,6 +2,7 @@ use three_d::{
     degrees, vec3, Camera, ClearState, Context, CpuMaterial, CpuMesh, DirectionalLight,
     FrameOutput, Gm, InnerSpace, Mat4, Mesh, OrbitControl, PhysicalMaterial, Srgba, Vector3,
     Window, WindowSettings,
+    egui::{Slider, SidePanel}
 };
 
 struct Particle {
@@ -89,8 +90,8 @@ pub fn main() {
     );
     let mut control = OrbitControl::new(*camera.target(), 1.0, 1000.0);
 
-    let amount = 100;
-    let border = 200.0;
+    let mut amount = 100;
+    let mut border = 200.0;
 
     let mut red_particles = initialize_particles(&context, border, 3.0, Srgba::RED, amount);
     let mut green_particles = initialize_particles(&context, border, 250.0, Srgba::GREEN, amount);
@@ -98,6 +99,8 @@ pub fn main() {
 
     let light0 = DirectionalLight::new(&context, 1.0, Srgba::WHITE, &vec3(0.0, -0.5, -0.5));
     let light1 = DirectionalLight::new(&context, 1.0, Srgba::WHITE, &vec3(0.0, 0.5, 0.5));
+
+    let mut gui = three_d::GUI::new(&context);
 
     window.render_loop(move |mut frame_input| {
         camera.set_viewport(frame_input.viewport);
@@ -126,6 +129,22 @@ pub fn main() {
             }
         }
 
+        let mut panel_width = 0.0;
+        gui.update(
+            &mut frame_input.events,
+            frame_input.accumulated_time,
+            frame_input.viewport,
+            frame_input.device_pixel_ratio,
+            |gui_context| {
+                SidePanel::left("side_panel").show(gui_context, |ui| {
+                    ui.heading("Debug Panel");
+                    ui.add(Slider::new(&mut amount, 1..=200).text("Amount"));
+                    ui.add(Slider::new(&mut border, 50.0..=500.0).text("Border"));
+                });
+                panel_width = gui_context.used_rect().width();
+            },
+        );
+
         let spheres = red_particles
             .iter()
             .chain(green_particles.iter())
@@ -136,7 +155,8 @@ pub fn main() {
         frame_input
             .screen()
             .clear(ClearState::color_and_depth(0.8, 0.8, 0.8, 1.0, 1.0))
-            .render(&camera, &spheres, &[&light0, &light1]);
+            .render(&camera, &spheres, &[&light0, &light1])
+            .write(|| gui.render());
 
         FrameOutput::default()
     });
