@@ -2,23 +2,23 @@
   inputs = {
     nixpkgs = { url = "github:nixos/nixpkgs/nixos-unstable"; };
     rust-overlay = { url = "github:oxalica/rust-overlay"; };
+    flake-utils.url  = "github:numtide/flake-utils";
   };
 
-  outputs = { nixpkgs, rust-overlay, ... }:
-    let system = "x86_64-linux";
-    in {
-      devShell.${system} = let
+  outputs = { self, nixpkgs, rust-overlay, flake-utils, ... }:
+    flake-utils.lib.eachDefaultSystem (system:
+      let
+        overlays = [ (import rust-overlay) ];
         pkgs = import nixpkgs {
-          inherit system;
-          overlays = [ rust-overlay.overlay ];
+          inherit system overlays;
         };
-      in (({ pkgs, ... }:
-        pkgs.mkShell {
-          buildInputs = with pkgs; [
+      in
+      with pkgs;
+      {
+        devShells.default = mkShell {
+          buildInputs = [
             cargo
-            cargo-watch
             nodejs
-            clippy
             xorg.libX11
             xorg.libXrandr
             xorg.libXcursor
@@ -50,6 +50,7 @@
           '';
 
           RUST_SRC_PATH = "${pkgs.rustPlatform.rustLibSrc}";
-        }) { pkgs = pkgs; });
-    };
+        };
+    }
+  );
 }
