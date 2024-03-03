@@ -176,7 +176,9 @@ pub fn run() {
                     };
                     ui.add(Slider::new(&mut parameters.border, 50.0..=500.0).text("Border"));
                     ui.add(Slider::new(&mut parameters.mass_red, 1.0..=5000.0).text("Mass Red"));
-                    ui.add(Slider::new(&mut parameters.mass_green, 1.0..=5000.0).text("Mass Green"));
+                    ui.add(
+                        Slider::new(&mut parameters.mass_green, 1.0..=5000.0).text("Mass Green"),
+                    );
                     ui.add(Slider::new(&mut parameters.mass_blue, 1.0..=5000.0).text("Mass Blue"));
                 });
                 panel_width = gui_context.used_rect().width();
