@@ -263,16 +263,16 @@ fn mutual_gravity_rule(
     }
 }
 
-fn apply_identity_gravity_rule(particles: &mut Vec<Particle>, g: f32) {
+fn apply_identity_gravity_rule(particles: &mut [Particle], g: f32) {
     let postion_clones = particles.iter().map(|p| p.position).collect::<Vec<_>>();
     let mass_clones = particles.iter().map(|p| p.mass).collect::<Vec<_>>();
     let len = particles.len();
-    for i in 0..len {
+    for (i, particle) in particles.iter_mut().enumerate().take(len) {
         for j in 0..len {
             if i == j {
                 continue;
             }
-            particles[i].update_velocity(postion_clones[j], mass_clones[j], g);
+            particle.update_velocity(postion_clones[j], mass_clones[j], g);
         }
     }
 }
