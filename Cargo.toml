@@ -10,8 +10,10 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 three-d = { version = "0.16.4", features = ["window", "egui-gui"] }
-log = "0.4.21"
 rand = "=0.8.5"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+log = "0.4"
 getrandom = { version = "0.2.12", features = ["js"] }
 wasm-bindgen = "0.2.91"
 wasm-bindgen-futures = "0.4"
