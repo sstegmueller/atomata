@@ -267,7 +267,7 @@ fn apply_identity_gravity_rule(particles: &mut [Particle], g: f32) {
     let postion_clones = particles.iter().map(|p| p.position).collect::<Vec<_>>();
     let mass_clones = particles.iter().map(|p| p.mass).collect::<Vec<_>>();
     let len = particles.len();
-    for (i, particle) in particles.iter_mut().enumerate().take(len) {
+    for (i, particle) in particles.iter_mut().enumerate() {
         for j in 0..len {
             if i == j {
                 continue;
