@@ -1,8 +1,15 @@
+mod parameters;
+mod particle;
+mod sphere;
+
+use parameters::Parameters;
+use particle::Particle;
+use sphere::Sphere;
 use three_d::{
     degrees,
     egui::{SidePanel, Slider},
-    vec3, Camera, ClearState, Context, CpuMaterial, CpuMesh, DirectionalLight, FrameOutput, Gm,
-    InnerSpace, Mat4, Mesh, OrbitControl, PhysicalMaterial, Srgba, Vector3, Window, WindowSettings,
+    vec3, Camera, ClearState, Context, DirectionalLight, FrameOutput, OrbitControl, Srgba, Window,
+    WindowSettings,
 };
 
 // Entry point for wasm
@@ -15,84 +22,12 @@ pub fn start() -> Result<(), JsValue> {
     console_log::init_with_level(log::Level::Debug).unwrap();
 
     use log::info;
+
     info!("Logging works!");
 
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
     run();
     Ok(())
-}
-
-struct Parameters {
-    amount: usize,
-    border: f32,
-    mass_red: f32,
-    mass_green: f32,
-    mass_blue: f32,
-}
-
-struct Particle {
-    position: Vector3<f32>,
-    velocity: Vector3<f32>,
-    mass: f32,
-    sphere: Gm<Mesh, PhysicalMaterial>,
-}
-
-impl Particle {
-    pub fn new(context: &Context, border: f32, mass: f32, color: Srgba) -> Self {
-        let factor = border / 2.0;
-        // generate random position in the range of -1 to +1 time factor
-        let x = (rand::random::<f32>() - 0.5) * factor;
-        let y = (rand::random::<f32>() - 0.5) * factor;
-        let z = (rand::random::<f32>() - 0.5) * factor;
-        let position = vec3(x, y, z);
-
-        let mut sphere = Gm::new(
-            Mesh::new(context, &CpuMesh::sphere(16)),
-            PhysicalMaterial::new_transparent(
-                context,
-                &CpuMaterial {
-                    albedo: color,
-                    ..Default::default()
-                },
-            ),
-        );
-
-        sphere.set_transformation(Mat4::from_translation(position) * Mat4::from_scale(0.2));
-
-        Self {
-            position,
-            velocity: vec3(0.0, 0.0, 0.0),
-            mass,
-            sphere,
-        }
-    }
-
-    pub fn update_velocity(
-        &mut self,
-        other_position: Vector3<f32>,
-        other_mass: f32,
-        gravity_constant: f32,
-    ) {
-        let distance = self.position - other_position;
-        let distance_squared = distance.dot(distance);
-        let mut directed_acceleration = vec3(0.0, 0.0, 0.0);
-        if distance_squared > 0.0001 {
-            let acceleration = gravity_constant * other_mass / distance_squared;
-            directed_acceleration = distance.normalize() * acceleration;
-        }
-
-        self.velocity += directed_acceleration;
-    }
-
-    pub fn update_position(&mut self, time_step: f32) {
-        self.position += self.velocity * time_step;
-        self.sphere
-            .set_transformation(Mat4::from_translation(self.position));
-    }
-
-    pub fn apply_friction(&mut self, friction: f32) {
-        self.velocity *= 1.0 - friction;
-    }
 }
 
 pub fn run() {
@@ -123,8 +58,11 @@ pub fn run() {
         mass_blue: 1000.0,
     };
 
-    let (mut red_particles, mut green_particles, mut blue_particles) =
-        create_particles(&context, &parameters);
+    let (
+        mut red_particles,
+        mut green_particles,
+        mut blue_particles,
+    ) = create_particles(&context, &parameters);
     let light0 = DirectionalLight::new(&context, 1.0, Srgba::WHITE, &vec3(0.0, -0.5, -0.5));
     let light1 = DirectionalLight::new(&context, 1.0, Srgba::WHITE, &vec3(0.0, 0.5, 0.5));
 
@@ -147,14 +85,7 @@ pub fn run() {
             .chain(blue_particles.iter_mut())
         {
             particle.apply_friction(0.005);
-            particle.update_position(0.01);
-
-            // apply spherical border collision
-            let distance_from_center = particle.position.magnitude();
-
-            if distance_from_center.abs() > parameters.border {
-                particle.velocity = -particle.velocity;
-            }
+            particle.update_position(0.0002, &parameters);
         }
 
         let mut panel_width = 0.0;
@@ -168,8 +99,11 @@ pub fn run() {
                     ui.heading("Parameters");
                     ui.add(Slider::new(&mut parameters.amount, 1..=200).text("Amount"));
                     if ui.button("Reset").clicked() {
-                        let (new_red_particles, new_green_particles, new_blue_particles) =
-                            create_particles(&context, &parameters);
+                        let (
+                            new_red_particles,
+                            new_green_particles,
+                            new_blue_particles,
+                        ) = create_particles(&context, &parameters);
                         red_particles = new_red_particles;
                         green_particles = new_green_particles;
                         blue_particles = new_blue_particles;
@@ -189,7 +123,7 @@ pub fn run() {
             .iter()
             .chain(green_particles.iter())
             .chain(blue_particles.iter())
-            .map(|p| &p.sphere)
+            .map(|p| p.positionable.get_geometry())
             .collect::<Vec<_>>();
 
         frame_input
@@ -205,7 +139,11 @@ pub fn run() {
 fn create_particles(
     context: &Context,
     parameters: &Parameters,
-) -> (Vec<Particle>, Vec<Particle>, Vec<Particle>) {
+) -> (
+    Vec<Particle>,
+    Vec<Particle>,
+    Vec<Particle>,
+) {
     let red_particles = initialize_particle_kind(
         context,
         parameters.border,
@@ -227,11 +165,15 @@ fn create_particles(
         Srgba::BLUE,
         parameters.amount,
     );
-    (red_particles, green_particles, blue_particles)
+    (
+        red_particles,
+        green_particles,
+        blue_particles,
+    )
 }
 
-fn initialize_particle_kind(
-    context: &Context,
+fn initialize_particle_kind<'a>(
+    context: &'a Context,
     border: f32,
     mass: f32,
     color: Srgba,
@@ -239,7 +181,8 @@ fn initialize_particle_kind(
 ) -> Vec<Particle> {
     let mut particles = Vec::new();
     for _ in 0..amount {
-        particles.push(Particle::new(context, border, mass, color));
+        let sphere = Sphere::new(context, color);
+        particles.push(Particle::new(Box::new(sphere), border, mass));
     }
     particles
 }
