@@ -72,12 +72,12 @@ pub fn run() {
         camera.set_viewport(frame_input.viewport);
         control.handle_events(&mut camera, &mut frame_input.events);
 
-        apply_mutual_gravity_rule(&mut red_particles, &mut green_particles, -1.0);
-        apply_mutual_gravity_rule(&mut red_particles, &mut blue_particles, -1.0);
-        apply_mutual_gravity_rule(&mut blue_particles, &mut green_particles, -1.0);
-        apply_identity_gravity_rule(&mut red_particles, -1.0);
-        apply_identity_gravity_rule(&mut blue_particles, -1.0);
-        apply_identity_gravity_rule(&mut green_particles, -1.0);
+        apply_mutual_gravity_rule(&mut red_particles, &mut green_particles, 1.0);
+        apply_mutual_gravity_rule(&mut red_particles, &mut blue_particles, 1.0);
+        apply_mutual_gravity_rule(&mut blue_particles, &mut green_particles, 1.0);
+        apply_identity_gravity_rule(&mut red_particles, 1.0);
+        apply_identity_gravity_rule(&mut blue_particles, 1.0);
+        apply_identity_gravity_rule(&mut green_particles, 1.0);
 
         for particle in red_particles
             .iter_mut()
