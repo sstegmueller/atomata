@@ -1,7 +1,4 @@
-use three_d::{
-    Context, CpuMaterial, CpuMesh, Gm,
-    Mat4, Mesh, PhysicalMaterial, Srgba, Vector3
-};
+use three_d::{Context, CpuMaterial, CpuMesh, Gm, Mat4, Mesh, PhysicalMaterial, Srgba, Vector3};
 
 pub trait PositionableRender {
     fn set_position(&mut self, position: Vector3<f32>);
@@ -31,9 +28,10 @@ impl Sphere {
 
 impl PositionableRender for Sphere {
     fn set_position(&mut self, position: Vector3<f32>) {
-        self.geometry.set_transformation(Mat4::from_translation(position));
+        self.geometry
+            .set_transformation(Mat4::from_translation(position));
     }
-    fn get_geometry(&self) -> &Gm<Mesh, PhysicalMaterial>{
+    fn get_geometry(&self) -> &Gm<Mesh, PhysicalMaterial> {
         &self.geometry
     }
 }

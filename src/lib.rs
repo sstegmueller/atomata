@@ -58,11 +58,8 @@ pub fn run() {
         mass_blue: 1000.0,
     };
 
-    let (
-        mut red_particles,
-        mut green_particles,
-        mut blue_particles,
-    ) = create_particles(&context, &parameters);
+    let (mut red_particles, mut green_particles, mut blue_particles) =
+        create_particles(&context, &parameters);
     let light0 = DirectionalLight::new(&context, 1.0, Srgba::WHITE, &vec3(0.0, -0.5, -0.5));
     let light1 = DirectionalLight::new(&context, 1.0, Srgba::WHITE, &vec3(0.0, 0.5, 0.5));
 
@@ -99,11 +96,8 @@ pub fn run() {
                     ui.heading("Parameters");
                     ui.add(Slider::new(&mut parameters.amount, 1..=200).text("Amount"));
                     if ui.button("Reset").clicked() {
-                        let (
-                            new_red_particles,
-                            new_green_particles,
-                            new_blue_particles,
-                        ) = create_particles(&context, &parameters);
+                        let (new_red_particles, new_green_particles, new_blue_particles) =
+                            create_particles(&context, &parameters);
                         red_particles = new_red_particles;
                         green_particles = new_green_particles;
                         blue_particles = new_blue_particles;
@@ -139,11 +133,7 @@ pub fn run() {
 fn create_particles(
     context: &Context,
     parameters: &Parameters,
-) -> (
-    Vec<Particle>,
-    Vec<Particle>,
-    Vec<Particle>,
-) {
+) -> (Vec<Particle>, Vec<Particle>, Vec<Particle>) {
     let red_particles = initialize_particle_kind(
         context,
         parameters.border,
@@ -165,11 +155,7 @@ fn create_particles(
         Srgba::BLUE,
         parameters.amount,
     );
-    (
-        red_particles,
-        green_particles,
-        blue_particles,
-    )
+    (red_particles, green_particles, blue_particles)
 }
 
 fn initialize_particle_kind<'a>(

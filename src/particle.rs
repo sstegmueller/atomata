@@ -1,6 +1,4 @@
-use three_d::{
-    vec3, InnerSpace, Vector3
-};
+use three_d::{vec3, InnerSpace, Vector3};
 
 use crate::parameters::Parameters;
 use crate::sphere::PositionableRender;
@@ -75,31 +73,31 @@ mod tests {
     use three_d::{Gm, Mesh, PhysicalMaterial};
 
     use super::*;
-    
+
     struct MockPositionableRender;
-    
+
     impl PositionableRender for MockPositionableRender {
         fn set_position(&mut self, _position: Vector3<f32>) {
             // Do nothing
         }
-        
+
         fn get_geometry(&self) -> &Gm<Mesh, PhysicalMaterial> {
-           todo!() 
+            todo!()
         }
     }
-    
+
     #[test]
     fn test_new_particle() {
         let positionable = Box::new(MockPositionableRender);
         let border = 10.0;
         let mass = 1.0;
-        
+
         let particle = Particle::new(positionable, border, mass);
-        
+
         assert_eq!(particle.mass, mass);
         assert_eq!(particle.velocity, Vector3::new(0.0, 0.0, 0.0));
     }
-    
+
     #[test]
     fn test_update_velocity() {
         let mut particle = Particle {
@@ -108,16 +106,19 @@ mod tests {
             mass: 1.0,
             velocity: Vector3::new(0.0, 0.0, 0.0),
         };
-        
+
         let other_position = Vector3::new(2.0, 2.0, 2.0);
         let other_mass = 2.0;
         let gravity_constant = 9.8;
-        
+
         particle.update_velocity(other_position, other_mass, gravity_constant);
-        
-        assert_eq!(particle.velocity, Vector3::new(0.94300544, 0.94300544, 0.94300544));
+
+        assert_eq!(
+            particle.velocity,
+            Vector3::new(0.94300544, 0.94300544, 0.94300544)
+        );
     }
-    
+
     #[test]
     fn test_update_position() {
         let mut particle = Particle {
@@ -126,15 +127,21 @@ mod tests {
             mass: 1.0,
             velocity: Vector3::new(1.0, 1.0, 1.0),
         };
-        
+
         let time_step = 0.1;
-        let parameters = Parameters { border: 10.0, amount: 30, mass_red: 1.0, mass_green: 1.0, mass_blue: 1.0 };
-        
+        let parameters = Parameters {
+            border: 10.0,
+            amount: 30,
+            mass_red: 1.0,
+            mass_green: 1.0,
+            mass_blue: 1.0,
+        };
+
         particle.update_position(time_step, &parameters);
-        
+
         assert_eq!(particle.position, Vector3::new(0.1, 0.1, 0.1));
     }
-    
+
     #[test]
     fn test_apply_friction() {
         let mut particle = Particle {
@@ -143,14 +150,14 @@ mod tests {
             mass: 1.0,
             velocity: Vector3::new(1.0, 1.0, 1.0),
         };
-        
+
         let friction = 0.5;
-        
+
         particle.apply_friction(friction);
-        
+
         assert_eq!(particle.velocity, Vector3::new(0.5, 0.5, 0.5));
     }
-    
+
     #[test]
     fn test_compute_updated_position() {
         let particle = Particle {
@@ -159,12 +166,11 @@ mod tests {
             mass: 1.0,
             velocity: Vector3::new(1.0, 1.0, 1.0),
         };
-        
+
         let time_step = 0.1;
-        
+
         let updated_position = particle.compute_updated_position(time_step);
-        
+
         assert_eq!(updated_position, Vector3::new(0.1, 0.1, 0.1));
     }
 }
-
