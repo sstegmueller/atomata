@@ -158,8 +158,8 @@ fn create_particles(
     (red_particles, green_particles, blue_particles)
 }
 
-fn initialize_particle_kind<'a>(
-    context: &'a Context,
+fn initialize_particle_kind(
+    context: &Context,
     border: f32,
     mass: f32,
     color: Srgba,
