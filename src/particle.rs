@@ -45,14 +45,14 @@ impl Particle {
         }
     }
 
-    pub fn update_position(&mut self, time_step: f32, parameters: &Parameters) {
-        let mut updated_position = self.compute_updated_position(time_step);
+    pub fn update_position(&mut self, parameters: &Parameters) {
+        let mut updated_position = self.compute_updated_position(parameters.timestep);
 
         let distance_from_center = updated_position.magnitude();
 
         if distance_from_center.abs() > parameters.border {
             self.velocity = -self.velocity;
-            updated_position = self.compute_updated_position(time_step);
+            updated_position = self.compute_updated_position(parameters.timestep);
         }
 
         self.position = updated_position;
@@ -128,16 +128,18 @@ mod tests {
             velocity: Vector3::new(1.0, 1.0, 1.0),
         };
 
-        let time_step = 0.1;
         let parameters = Parameters {
             border: 10.0,
             amount: 30,
+            timestep: 0.1,
+            gravity_constant: 9.8,
+            friction: 0.5,
             mass_red: 1.0,
             mass_green: 1.0,
             mass_blue: 1.0,
         };
 
-        particle.update_position(time_step, &parameters);
+        particle.update_position(&parameters);
 
         assert_eq!(particle.position, Vector3::new(0.1, 0.1, 0.1));
     }
