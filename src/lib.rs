@@ -53,6 +53,9 @@ pub fn run() {
     let mut parameters = Parameters {
         amount: 10,
         border: 200.0,
+        timestep: 0.0002,
+        gravity_constant: 1.0,
+        friction: 0.005,
         mass_red: 3.0,
         mass_green: 250.0,
         mass_blue: 1000.0,
@@ -69,20 +72,32 @@ pub fn run() {
         camera.set_viewport(frame_input.viewport);
         control.handle_events(&mut camera, &mut frame_input.events);
 
-        apply_mutual_gravity_rule(&mut red_particles, &mut green_particles, 1.0);
-        apply_mutual_gravity_rule(&mut red_particles, &mut blue_particles, 1.0);
-        apply_mutual_gravity_rule(&mut blue_particles, &mut green_particles, 1.0);
-        apply_identity_gravity_rule(&mut red_particles, 1.0);
-        apply_identity_gravity_rule(&mut blue_particles, 1.0);
-        apply_identity_gravity_rule(&mut green_particles, 1.0);
+        apply_mutual_gravity_rule(
+            &mut red_particles,
+            &mut green_particles,
+            parameters.gravity_constant,
+        );
+        apply_mutual_gravity_rule(
+            &mut red_particles,
+            &mut blue_particles,
+            parameters.gravity_constant,
+        );
+        apply_mutual_gravity_rule(
+            &mut blue_particles,
+            &mut green_particles,
+            parameters.gravity_constant,
+        );
+        apply_identity_gravity_rule(&mut red_particles, parameters.gravity_constant);
+        apply_identity_gravity_rule(&mut blue_particles, parameters.gravity_constant);
+        apply_identity_gravity_rule(&mut green_particles, parameters.gravity_constant);
 
         for particle in red_particles
             .iter_mut()
             .chain(green_particles.iter_mut())
             .chain(blue_particles.iter_mut())
         {
-            particle.apply_friction(0.005);
-            particle.update_position(0.0002, &parameters);
+            particle.apply_friction(parameters.friction);
+            particle.update_position(&parameters);
         }
 
         let mut panel_width = 0.0;
@@ -103,6 +118,12 @@ pub fn run() {
                         blue_particles = new_blue_particles;
                     };
                     ui.add(Slider::new(&mut parameters.border, 50.0..=500.0).text("Border"));
+                    ui.add(Slider::new(&mut parameters.timestep, 0.0001..=0.001).text("Timestep"));
+                    ui.add(Slider::new(&mut parameters.friction, 0.0..=0.01).text("Friction"));
+                    ui.add(
+                        Slider::new(&mut parameters.gravity_constant, 0.1..=20.0)
+                            .text("Gravity constant"),
+                    );
                     ui.add(Slider::new(&mut parameters.mass_red, 1.0..=5000.0).text("Mass Red"));
                     ui.add(
                         Slider::new(&mut parameters.mass_green, 1.0..=5000.0).text("Mass Green"),
