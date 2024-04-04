@@ -24,11 +24,11 @@ jobs:
           cd web &&
           npm install &&
           npx wasm-pack build "../." --target web --out-name web --out-dir ./web/pkg &&
-          rm pkg/.gitignore
+          npm run build
 
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v3
         if: github.ref == 'refs/heads/main'
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./web
+          publish_dir: ./web/dist
