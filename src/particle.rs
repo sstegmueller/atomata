@@ -8,24 +8,34 @@ pub struct Particle {
     pub positionable: Box<dyn PositionableRender>,
     pub mass: f32,
     velocity: Vector3<f32>,
+    max_velocity: f32,
 }
 
 impl Particle {
-    pub fn new(mut positionable: Box<dyn PositionableRender>, border: f32, mass: f32) -> Self {
-        let factor = border / 2.0;
+    pub fn new(
+        mut positionable: Box<dyn PositionableRender>,
+        border: f32,
+        mass: f32,
+        max_velocity: f32,
+    ) -> Self {
         // generate random position in the range of -1 to +1 times factor
-        let x = (rand::random::<f32>() - 0.5) * factor;
-        let y = (rand::random::<f32>() - 0.5) * factor;
-        let z = (rand::random::<f32>() - 0.5) * factor;
+        let x = (rand::random::<f32>() - 0.5) * border;
+        let y = (rand::random::<f32>() - 0.5) * border;
+        let z = (rand::random::<f32>() - 0.5) * border;
         let position = vec3(x, y, z);
-
         positionable.set_position(position);
+
+        // initialize random velocity from 0 top max_velocity
+        let vx = (rand::random::<f32>() - 0.5) * max_velocity;
+        let vy = (rand::random::<f32>() - 0.5) * max_velocity;
+        let vz = (rand::random::<f32>() - 0.5) * max_velocity;
 
         Self {
             position,
-            velocity: vec3(0.0, 0.0, 0.0),
+            velocity: vec3(vx, vy, vz),
             mass,
             positionable,
+            max_velocity,
         }
     }
 
@@ -42,6 +52,18 @@ impl Particle {
             let force = direction.normalize() * force_magnitude;
 
             self.velocity += force / self.mass;
+
+            if self.velocity.x.abs() > self.max_velocity {
+                self.velocity.x = self.velocity.x.signum() * self.max_velocity;
+            }
+
+            if self.velocity.y.abs() > self.max_velocity {
+                self.velocity.y = self.velocity.y.signum() * self.max_velocity;
+            }
+
+            if self.velocity.z.abs() > self.max_velocity {
+                self.velocity.z = self.velocity.z.signum() * self.max_velocity;
+            }
         }
     }
 
@@ -91,11 +113,21 @@ mod tests {
         let positionable = Box::new(MockPositionableRender);
         let border = 10.0;
         let mass = 1.0;
+        let max_velocity = 1000.0;
 
-        let particle = Particle::new(positionable, border, mass);
+        let particle = Particle::new(positionable, border, mass, max_velocity);
 
         assert_eq!(particle.mass, mass);
-        assert_eq!(particle.velocity, Vector3::new(0.0, 0.0, 0.0));
+
+        // assert position is within the range of -border/2 to +border/2
+        assert!(particle.position.x >= -border && particle.position.x <= border);
+        assert!(particle.position.y >= -border && particle.position.y <= border);
+        assert!(particle.position.z >= -border && particle.position.z <= border);
+
+        // assert velocity is within the range of -max_velocity to +max_velocity
+        assert!(particle.velocity.x >= -max_velocity && particle.velocity.x <= max_velocity);
+        assert!(particle.velocity.y >= -max_velocity && particle.velocity.y <= max_velocity);
+        assert!(particle.velocity.z >= -max_velocity && particle.velocity.z <= max_velocity);
     }
 
     #[test]
@@ -105,6 +137,7 @@ mod tests {
             positionable: Box::new(MockPositionableRender),
             mass: 1.0,
             velocity: Vector3::new(0.0, 0.0, 0.0),
+            max_velocity: 1000.0,
         };
 
         let other_position = Vector3::new(2.0, 2.0, 2.0);
@@ -126,6 +159,7 @@ mod tests {
             positionable: Box::new(MockPositionableRender),
             mass: 1.0,
             velocity: Vector3::new(1.0, 1.0, 1.0),
+            max_velocity: 1000.0,
         };
 
         let parameters = Parameters {
@@ -137,6 +171,7 @@ mod tests {
             mass_red: 1.0,
             mass_green: 1.0,
             mass_blue: 1.0,
+            max_velocity: 1000.0,
         };
 
         particle.update_position(&parameters);
@@ -151,6 +186,7 @@ mod tests {
             positionable: Box::new(MockPositionableRender),
             mass: 1.0,
             velocity: Vector3::new(1.0, 1.0, 1.0),
+            max_velocity: 1000.0,
         };
 
         let friction = 0.5;
@@ -167,6 +203,7 @@ mod tests {
             positionable: Box::new(MockPositionableRender),
             mass: 1.0,
             velocity: Vector3::new(1.0, 1.0, 1.0),
+            max_velocity: 1000.0,
         };
 
         let time_step = 0.1;
