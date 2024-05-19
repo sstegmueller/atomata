@@ -118,7 +118,10 @@ pub fn run() {
                         green_particles = new_green_particles;
                         blue_particles = new_blue_particles;
                     };
-                    ui.add(Slider::new(&mut parameters.max_velocity, 50.0..=50000.0).text("Max. velocity"));
+                    ui.add(
+                        Slider::new(&mut parameters.max_velocity, 50.0..=50000.0)
+                            .text("Max. velocity"),
+                    );
                     ui.add(Slider::new(&mut parameters.border, 50.0..=500.0).text("Border"));
                     ui.add(Slider::new(&mut parameters.timestep, 0.0001..=0.001).text("Timestep"));
                     ui.add(Slider::new(&mut parameters.friction, 0.0..=0.01).text("Friction"));
@@ -200,11 +203,7 @@ fn initialize_particle_kind(
     particles
 }
 
-fn apply_mutual_forces(
-    particles_0: &mut Vec<Particle>,
-    particles_1: &mut Vec<Particle>,
-    g: f32,
-) {
+fn apply_mutual_forces(particles_0: &mut Vec<Particle>, particles_1: &mut Vec<Particle>, g: f32) {
     do_apply_mutual_forces(particles_0, particles_1, g);
     do_apply_mutual_forces(particles_1, particles_0, g);
 }

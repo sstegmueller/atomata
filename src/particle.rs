@@ -12,7 +12,12 @@ pub struct Particle {
 }
 
 impl Particle {
-    pub fn new(mut positionable: Box<dyn PositionableRender>, border: f32, mass: f32, max_velocity: f32) -> Self {
+    pub fn new(
+        mut positionable: Box<dyn PositionableRender>,
+        border: f32,
+        mass: f32,
+        max_velocity: f32,
+    ) -> Self {
         // generate random position in the range of -1 to +1 times factor
         let x = (rand::random::<f32>() - 0.5) * border;
         let y = (rand::random::<f32>() - 0.5) * border;
@@ -24,7 +29,7 @@ impl Particle {
         let vx = (rand::random::<f32>() - 0.5) * max_velocity;
         let vy = (rand::random::<f32>() - 0.5) * max_velocity;
         let vz = (rand::random::<f32>() - 0.5) * max_velocity;
-        
+
         Self {
             position,
             velocity: vec3(vx, vy, vz),
@@ -108,7 +113,7 @@ mod tests {
         let positionable = Box::new(MockPositionableRender);
         let border = 10.0;
         let mass = 1.0;
-        let max_velocity= 1000.0;
+        let max_velocity = 1000.0;
 
         let particle = Particle::new(positionable, border, mass, max_velocity);
 
