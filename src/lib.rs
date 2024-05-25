@@ -1,6 +1,7 @@
 mod parameters;
 mod particle;
 mod sphere;
+mod persistence;
 
 use parameters::Parameters;
 use particle::Particle;
