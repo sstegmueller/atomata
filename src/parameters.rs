@@ -8,4 +8,6 @@ pub struct Parameters {
     pub mass_green: f32,
     pub mass_blue: f32,
     pub max_velocity: f32,
+    pub database_path: String,
+    pub bucket_size: f32,
 }

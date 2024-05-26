@@ -1,10 +1,11 @@
 mod parameters;
 mod particle;
-mod sphere;
 mod persistence;
+mod sphere;
 
 use parameters::Parameters;
 use particle::Particle;
+use persistence::{open_database, persist_state_count};
 use sphere::Sphere;
 use three_d::{
     degrees,
@@ -61,7 +62,11 @@ pub fn run() {
         mass_green: 250.0,
         mass_blue: 1000.0,
         max_velocity: 20000.0,
+        database_path: "particles_states.db".to_string(),
+        bucket_size: 10.0,
     };
+
+    let db = open_database(&parameters.database_path).unwrap();
 
     let (mut red_particles, mut green_particles, mut blue_particles) =
         create_particles(&context, &parameters);
@@ -100,6 +105,8 @@ pub fn run() {
         {
             particle.apply_friction(parameters.friction);
             particle.update_position(&parameters);
+            persist_state_count(particle, db.clone(), parameters.bucket_size).unwrap();
+            db.flush().unwrap();
         }
 
         let mut panel_width = 0.0;

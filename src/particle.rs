@@ -1,7 +1,7 @@
 use three_d::{vec3, InnerSpace, Vector3};
 
-use crate::persistence::StateVector;
 use crate::parameters::Parameters;
+use crate::persistence::StateVector;
 use crate::sphere::PositionableRender;
 
 pub struct Particle {
@@ -89,16 +89,8 @@ impl Particle {
     pub fn to_state_vector(&self, bucket_size: f32) -> StateVector {
         StateVector::new(
             self.mass,
-            (
-                self.position.x,
-                self.position.y,
-                self.position.z,
-            ),
-            (
-                self.velocity.x,
-                self.velocity.y,
-                self.velocity.z,
-            ),
+            (self.position.x, self.position.y, self.position.z),
+            (self.velocity.x, self.velocity.y, self.velocity.z),
             bucket_size,
         )
     }
