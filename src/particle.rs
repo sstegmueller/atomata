@@ -182,6 +182,8 @@ mod tests {
             mass_green: 1.0,
             mass_blue: 1.0,
             max_velocity: 1000.0,
+            bucket_size: 1.0,
+            database_path: "particles_states.db".to_string(),
         };
 
         particle.update_position(&parameters);

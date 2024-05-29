@@ -5,7 +5,7 @@ mod sphere;
 
 use parameters::Parameters;
 use particle::Particle;
-use persistence::{open_database, persist_state_count};
+use persistence::{migrate_to_latest, open_database, persist_state_count};
 use sphere::Sphere;
 use three_d::{
     degrees,
@@ -66,7 +66,8 @@ pub fn run() {
         bucket_size: 10.0,
     };
 
-    let db = open_database(&parameters.database_path).unwrap();
+    let mut connection = open_database(&parameters.database_path).unwrap();
+    migrate_to_latest(&mut connection).unwrap();
 
     let (mut red_particles, mut green_particles, mut blue_particles) =
         create_particles(&context, &parameters);
@@ -105,8 +106,7 @@ pub fn run() {
         {
             particle.apply_friction(parameters.friction);
             particle.update_position(&parameters);
-            persist_state_count(particle, db.clone(), parameters.bucket_size).unwrap();
-            db.flush().unwrap();
+            persist_state_count(particle, &connection, parameters.bucket_size).unwrap();
         }
 
         let mut panel_width = 0.0;
