@@ -62,7 +62,7 @@ pub fn run() {
         mass_green: 250.0,
         mass_blue: 1000.0,
         max_velocity: 20000.0,
-        database_path: "particles_states.db".to_string(),
+        database_path: "./particles_states.db3".to_string(),
         bucket_size: 10.0,
     };
 

@@ -1,5 +1,5 @@
 use lazy_static::lazy_static;
-use rusqlite::{Connection, Result};
+use rusqlite::{params, Connection, Result};
 use rusqlite_migration::{Migrations, M};
 use std::error::Error;
 
@@ -9,14 +9,15 @@ lazy_static! {
     static ref MIGRATIONS: Migrations<'static> =
         Migrations::new(vec![
             M::up("CREATE TABLE state_vectors(
-                 mash INTEGER,
-                 px INTEGER,
-                 py INTEGER,
-                 pz INTEGER,
-                 vx INTEGER,
-                 vy INTEGER,
-                 vz INTEGER,
-                 count INTEGER
+                 mass INTEGER NOT NULL,
+                 px INTEGER NOT NULL,
+                 py INTEGER NOT NULL,
+                 pz INTEGER NOT NULL,
+                 vx INTEGER NOT NULL,
+                 vy INTEGER NOT NULL,
+                 vz INTEGER NOT NULL,
+                 count INTEGER,
+                 PRIMARY KEY (mass, px, py, pz, vx, vy, vz)
                );")
             .down("DROP TABLE state_vectors;"),
             // In the future, if the need to change the schema arises, put
@@ -77,14 +78,14 @@ pub fn persist_state_count(
          DO UPDATE SET count = count + 1;",
     )?;
 
-    stmt.execute([
-        &state_vector.mass,
-        &state_vector.position_bucket.0,
-        &state_vector.position_bucket.1,
-        &state_vector.position_bucket.2,
-        &state_vector.velocity_bucket.0,
-        &state_vector.velocity_bucket.1,
-        &state_vector.velocity_bucket.2,
+    stmt.execute(params![
+        state_vector.mass,
+        state_vector.position_bucket.0,
+        state_vector.position_bucket.1,
+        state_vector.position_bucket.2,
+        state_vector.velocity_bucket.0,
+        state_vector.velocity_bucket.1,
+        state_vector.velocity_bucket.2
     ])?;
     Ok(())
 }
