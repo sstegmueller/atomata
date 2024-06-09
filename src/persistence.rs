@@ -1,9 +1,7 @@
 use lazy_static::lazy_static;
-use rusqlite::{params, Connection, Result};
+use rusqlite::{params, Connection, Result, Transaction};
 use rusqlite_migration::{Migrations, M};
 use std::error::Error;
-
-use crate::particle::Particle;
 
 lazy_static! {
     static ref MIGRATIONS: Migrations<'static> =
@@ -65,19 +63,24 @@ pub fn migrate_to_latest(connection: &mut Connection) -> Result<(), rusqlite_mig
     MIGRATIONS.to_latest(connection)
 }
 
+pub fn create_transaction(connection: &mut Connection) -> Result<Transaction> {
+    connection.transaction()
+}
+
+pub fn commit_transaction(transaction: Transaction) -> Result<()> {
+    transaction.commit()
+}
+
 pub fn persist_state_count(
-    particle: &Particle,
-    connection: &Connection,
-    bucket_size: f32,
+    state_vector: &StateVector,
+    tx: &Transaction,
 ) -> Result<(), Box<dyn Error>> {
-    let state_vector = particle.to_state_vector(bucket_size);
-    let mut stmt = connection.prepare(
+    let mut stmt = tx.prepare(
         "INSERT INTO state_vectors (mass, px, py, pz, vx, vy, vz, count)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 1)
          ON CONFLICT(mass, px, py, pz, vx, vy, vz)
          DO UPDATE SET count = count + 1;",
     )?;
-
     stmt.execute(params![
         state_vector.mass,
         state_vector.position_bucket.0,
@@ -89,13 +92,34 @@ pub fn persist_state_count(
     ])?;
     Ok(())
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    fn open_memory_database() -> Connection {
+        Connection::open_in_memory().unwrap()
+    }
+
     #[test]
-    fn migrations_test() {
+    fn test_migrations(){
         assert!(MIGRATIONS.validate().is_ok());
+    }
+
+    #[test]
+    fn test_persist_state_count() {
+        let mut connection = open_memory_database();
+        migrate_to_latest(&mut connection).unwrap();
+        let tx = create_transaction(&mut connection).unwrap();
+        let state_vector = StateVector::new(1.0, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0), 10.0);
+        persist_state_count(&state_vector, &tx).unwrap();
+        commit_transaction(tx).unwrap();
+
+        let mut stmt = connection.prepare(
+            "SELECT count FROM state_vectors
+             WHERE mass = 1 AND px = 0 AND py = 0 AND pz = 0 AND vx = 0 AND vy = 0 AND vz = 0;",
+        ).unwrap();
+
+        let count: i32 = stmt.query_row([], |row| row.get(0)).unwrap();
+        assert_eq!(count, 1);
     }
 }

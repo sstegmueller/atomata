@@ -5,7 +5,7 @@ mod sphere;
 
 use parameters::Parameters;
 use particle::Particle;
-use persistence::{migrate_to_latest, open_database, persist_state_count};
+use persistence::{commit_transaction, create_transaction, migrate_to_latest, open_database, persist_state_count};
 use sphere::Sphere;
 use three_d::{
     degrees,
@@ -99,6 +99,7 @@ pub fn run() {
         apply_identity_forces(&mut blue_particles, parameters.gravity_constant);
         apply_identity_forces(&mut green_particles, parameters.gravity_constant);
 
+        let tx = create_transaction(&mut connection).unwrap();
         for particle in red_particles
             .iter_mut()
             .chain(green_particles.iter_mut())
@@ -106,8 +107,11 @@ pub fn run() {
         {
             particle.apply_friction(parameters.friction);
             particle.update_position(&parameters);
-            persist_state_count(particle, &connection, parameters.bucket_size).unwrap();
+
+            let state_vector = particle.to_state_vector(parameters.bucket_size);
+            persist_state_count(&state_vector, &tx).unwrap();
         }
+        commit_transaction(tx).unwrap();
 
         let mut panel_width = 0.0;
         gui.update(
