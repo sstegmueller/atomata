@@ -5,7 +5,9 @@ mod sphere;
 
 use parameters::Parameters;
 use particle::Particle;
-use persistence::{commit_transaction, create_transaction, migrate_to_latest, open_database, persist_state_count};
+use persistence::{
+    commit_transaction, create_transaction, migrate_to_latest, open_database, persist_state_count,
+};
 use sphere::Sphere;
 use three_d::{
     degrees,

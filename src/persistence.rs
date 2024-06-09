@@ -101,7 +101,7 @@ mod tests {
     }
 
     #[test]
-    fn test_migrations(){
+    fn test_migrations() {
         assert!(MIGRATIONS.validate().is_ok());
     }
 
@@ -114,10 +114,12 @@ mod tests {
         persist_state_count(&state_vector, &tx).unwrap();
         commit_transaction(tx).unwrap();
 
-        let mut stmt = connection.prepare(
-            "SELECT count FROM state_vectors
+        let mut stmt = connection
+            .prepare(
+                "SELECT count FROM state_vectors
              WHERE mass = 1 AND px = 0 AND py = 0 AND pz = 0 AND vx = 0 AND vy = 0 AND vz = 0;",
-        ).unwrap();
+            )
+            .unwrap();
 
         let count: i32 = stmt.query_row([], |row| row.get(0)).unwrap();
         assert_eq!(count, 1);
