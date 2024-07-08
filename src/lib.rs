@@ -1,13 +1,15 @@
 mod parameters;
 mod particle;
+#[cfg(not(target_arch = "wasm32"))]
 mod persistence;
 mod sphere;
 
 use parameters::{Mode, Parameters};
 use particle::Particle;
+#[cfg(not(target_arch = "wasm32"))]
 use persistence::{
     commit_transaction, create_transaction_provider, migrate_to_latest, open_database,
-    persist_state_count, TransactionProviderImpl,
+    persist_state_count,
 };
 use sphere::Sphere;
 use three_d::{
@@ -70,113 +72,123 @@ pub fn run() {
         mode: Mode::Default,
     };
 
-    let mut connection_provider = open_database(&default_parameters.database_path).unwrap();
-    migrate_to_latest(&mut connection_provider).unwrap();
-
     let (mut red_particles, mut green_particles, mut blue_particles) =
         create_particles(&context, &default_parameters);
     let light0 = DirectionalLight::new(&context, 1.0, Srgba::WHITE, &vec3(0.0, -0.5, -0.5));
     let light1 = DirectionalLight::new(&context, 1.0, Srgba::WHITE, &vec3(0.0, 0.5, 0.5));
 
     match default_parameters.mode {
-        Mode::Search => loop {
+        #[cfg(not(target_arch = "wasm32"))]
+        Mode::Search => {
+            let mut connection_provider = open_database(&default_parameters.database_path).unwrap();
+            migrate_to_latest(&mut connection_provider).unwrap();        
+
+            loop {
             let iterations = 10000;
 
             for _ in 0..iterations {
-                let mut tx = create_transaction_provider(&mut connection_provider).unwrap();
+                let tx_provider = create_transaction_provider(&mut connection_provider).unwrap();
                 update_particles(
-                    &mut red_particles,
-                    &mut green_particles,
-                    &mut blue_particles,
-                    &default_parameters,
-                    Some(&mut tx),
+                &mut red_particles,
+                &mut green_particles,
+                &mut blue_particles,
+                &default_parameters,
                 );
-                commit_transaction(tx).unwrap();
+                for particle in red_particles.iter().chain(green_particles.iter()).chain(blue_particles.iter()) {
+                let state_vector = particle.to_state_vector(default_parameters.bucket_size);
+                persist_state_count(&state_vector, &tx_provider).unwrap();
+                }
+                commit_transaction(tx_provider).unwrap();
             }
+            }
+        },
+        #[cfg(target_arch = "wasm32")]
+        Mode::Search => {
+            // Search logic not supported in wasm architecture
+            // Add appropriate error handling or fallback logic here
         },
         Mode::Default => {
             let mut gui = three_d::GUI::new(&context);
             window.render_loop(move |mut frame_input| {
-                camera.set_viewport(frame_input.viewport);
-                control.handle_events(&mut camera, &mut frame_input.events);
+            camera.set_viewport(frame_input.viewport);
+            control.handle_events(&mut camera, &mut frame_input.events);
 
-                update_particles(
-                    &mut red_particles,
-                    &mut green_particles,
-                    &mut blue_particles,
-                    &default_parameters,
-                    None,
-                );
+            update_particles(
+                &mut red_particles,
+                &mut green_particles,
+                &mut blue_particles,
+                &default_parameters,
+            );
 
-                let mut panel_width = 0.0;
-                gui.update(
-                    &mut frame_input.events,
-                    frame_input.accumulated_time,
-                    frame_input.viewport,
-                    frame_input.device_pixel_ratio,
-                    |gui_context| {
-                        SidePanel::left("side_panel").show(gui_context, |ui| {
-                            ui.heading("Parameters");
-                            ui.add(
-                                Slider::new(&mut default_parameters.amount, 1..=500).text("Amount"),
-                            );
-                            if ui.button("Reset").clicked() {
-                                let (new_red_particles, new_green_particles, new_blue_particles) =
-                                    create_particles(&context, &default_parameters);
-                                red_particles = new_red_particles;
-                                green_particles = new_green_particles;
-                                blue_particles = new_blue_particles;
-                            };
-                            ui.add(
-                                Slider::new(&mut default_parameters.max_velocity, 50.0..=50000.0)
-                                    .text("Max. velocity"),
-                            );
-                            ui.add(
-                                Slider::new(&mut default_parameters.border, 50.0..=500.0)
-                                    .text("Border"),
-                            );
-                            ui.add(
-                                Slider::new(&mut default_parameters.timestep, 0.0001..=0.001)
-                                    .text("Timestep"),
-                            );
-                            ui.add(
-                                Slider::new(&mut default_parameters.friction, 0.0..=0.01)
-                                    .text("Friction"),
-                            );
-                            ui.add(
-                                Slider::new(&mut default_parameters.gravity_constant, 0.1..=20.0)
-                                    .text("Gravity constant"),
-                            );
-                            ui.add(
-                                Slider::new(&mut default_parameters.mass_red, 1.0..=5000.0)
-                                    .text("Mass Red"),
-                            );
-                            ui.add(
-                                Slider::new(&mut default_parameters.mass_green, 1.0..=5000.0)
-                                    .text("Mass Green"),
-                            );
-                            ui.add(
-                                Slider::new(&mut default_parameters.mass_blue, 1.0..=5000.0)
-                                    .text("Mass Blue"),
-                            );
-                        });
-                        panel_width = gui_context.used_rect().width();
-                    },
-                );
+            let mut panel_width = 0.0;
+            gui.update(
+                &mut frame_input.events,
+                frame_input.accumulated_time,
+                frame_input.viewport,
+                frame_input.device_pixel_ratio,
+                |gui_context| {
+                SidePanel::left("side_panel").show(gui_context, |ui| {
+                    ui.heading("Parameters");
+                    ui.add(
+                    Slider::new(&mut default_parameters.amount, 1..=500).text("Amount"),
+                    );
+                    if ui.button("Reset").clicked() {
+                    let (new_red_particles, new_green_particles, new_blue_particles) =
+                        create_particles(&context, &default_parameters);
+                    red_particles = new_red_particles;
+                    green_particles = new_green_particles;
+                    blue_particles = new_blue_particles;
+                    };
+                    ui.add(
+                    Slider::new(&mut default_parameters.max_velocity, 50.0..=50000.0)
+                        .text("Max. velocity"),
+                    );
+                    ui.add(
+                    Slider::new(&mut default_parameters.border, 50.0..=500.0)
+                        .text("Border"),
+                    );
+                    ui.add(
+                    Slider::new(&mut default_parameters.timestep, 0.0001..=0.001)
+                        .text("Timestep"),
+                    );
+                    ui.add(
+                    Slider::new(&mut default_parameters.friction, 0.0..=0.01)
+                        .text("Friction"),
+                    );
+                    ui.add(
+                    Slider::new(&mut default_parameters.gravity_constant, 0.1..=20.0)
+                        .text("Gravity constant"),
+                    );
+                    ui.add(
+                    Slider::new(&mut default_parameters.mass_red, 1.0..=5000.0)
+                        .text("Mass Red"),
+                    );
+                    ui.add(
+                    Slider::new(&mut default_parameters.mass_green, 1.0..=5000.0)
+                        .text("Mass Green"),
+                    );
+                    ui.add(
+                    Slider::new(&mut default_parameters.mass_blue, 1.0..=5000.0)
+                        .text("Mass Blue"),
+                    );
+                });
+                panel_width = gui_context.used_rect().width();
+                },
+            );
 
-                let spheres = red_particles
-                    .iter()
-                    .chain(green_particles.iter())
-                    .chain(blue_particles.iter())
-                    .map(|p| p.positionable.get_geometry())
-                    .collect::<Vec<_>>();
-                frame_input
-                    .screen()
-                    .clear(ClearState::color_and_depth(0.8, 0.8, 0.8, 1.0, 1.0))
-                    .render(&camera, &spheres, &[&light0, &light1])
-                    .write(|| gui.render());
+            let spheres = red_particles
+                .iter()
+                .chain(green_particles.iter())
+                .chain(blue_particles.iter())
+                .map(|p| p.positionable.get_geometry())
+                .collect::<Vec<_>>();
+            frame_input
+                .screen()
+                .clear(ClearState::color_and_depth(0.8, 0.8, 0.8, 1.0, 1.0))
+                .render(&camera, &spheres, &[&light0, &light1])
+                .write(|| gui.render());
 
-                FrameOutput::default()
+            FrameOutput::default()
             });
         }
     }
@@ -234,7 +246,6 @@ fn update_particles(
     green_particles: &mut Vec<Particle>,
     blue_particles: &mut Vec<Particle>,
     parameters: &Parameters,
-    tx_provider: Option<&mut TransactionProviderImpl>,
 ) {
     apply_mutual_forces(red_particles, green_particles, parameters.gravity_constant);
     apply_mutual_forces(red_particles, blue_particles, parameters.gravity_constant);
@@ -250,12 +261,6 @@ fn update_particles(
     {
         particle.apply_friction(parameters.friction);
         particle.update_position(parameters);
-
-        let state_vector = particle.to_state_vector(parameters.bucket_size);
-
-        if let Some(ref tx_p) = tx_provider {
-            persist_state_count(&state_vector, *tx_p).unwrap();
-        }
     }
 }
 

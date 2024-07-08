@@ -1,7 +1,6 @@
 use three_d::{vec3, InnerSpace, Vector3};
 
 use crate::parameters::Parameters;
-use crate::persistence::StateVector;
 use crate::sphere::PositionableRender;
 
 pub struct Particle {
@@ -97,6 +96,37 @@ impl Particle {
 
     fn compute_updated_position(&self, time_step: f32) -> Vector3<f32> {
         self.position + self.velocity * time_step
+    }
+}
+
+
+#[derive(Hash, Eq, PartialEq, Debug)]
+pub struct StateVector {
+    pub mass: i32,
+    pub position_bucket: (i32, i32, i32),
+    pub velocity_bucket: (i32, i32, i32),
+}
+
+impl StateVector {
+    pub fn new(
+        mass: f32,
+        position: (f32, f32, f32),
+        velocity: (f32, f32, f32),
+        bucket_size: f32,
+    ) -> Self {
+        Self {
+            mass: mass as i32,
+            position_bucket: (
+                (position.0 / bucket_size) as i32,
+                (position.1 / bucket_size) as i32,
+                (position.2 / bucket_size) as i32,
+            ),
+            velocity_bucket: (
+                (velocity.0 / bucket_size) as i32,
+                (velocity.1 / bucket_size) as i32,
+                (velocity.2 / bucket_size) as i32,
+            ),
+        }
     }
 }
 
