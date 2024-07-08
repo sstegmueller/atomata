@@ -27,8 +27,6 @@ lazy_static! {
         ]);
 }
 
-
-
 trait ConnectionProvider {
     fn transaction(&mut self) -> Result<Transaction>;
 }
@@ -68,17 +66,17 @@ pub fn open_database(path: &str) -> Result<ConnectionProviderImpl> {
     })
 }
 
-pub fn migrate_to_latest(connection_provider: &mut ConnectionProviderImpl) -> Result<(), rusqlite_migration::Error> {
+pub fn migrate_to_latest(
+    connection_provider: &mut ConnectionProviderImpl,
+) -> Result<(), rusqlite_migration::Error> {
     MIGRATIONS.to_latest(&mut connection_provider.connection)
 }
 
 pub fn create_transaction_provider(
-    connection:  &mut ConnectionProviderImpl,
+    connection: &mut ConnectionProviderImpl,
 ) -> Result<TransactionProviderImpl<'_>, Box<dyn Error>> {
     let transaction = connection.transaction()?;
-    Ok(TransactionProviderImpl {
-        transaction,
-    })
+    Ok(TransactionProviderImpl { transaction })
 }
 
 pub fn commit_transaction(transaction: TransactionProviderImpl) -> Result<()> {
@@ -112,7 +110,9 @@ mod tests {
     use super::*;
 
     fn open_memory_database() -> ConnectionProviderImpl {
-        ConnectionProviderImpl{ connection: Connection::open_in_memory().unwrap() }
+        ConnectionProviderImpl {
+            connection: Connection::open_in_memory().unwrap(),
+        }
     }
 
     #[test]
@@ -129,7 +129,8 @@ mod tests {
         persist_state_count(&state_vector, &tx_provider).unwrap();
         commit_transaction(tx_provider).unwrap();
 
-        let mut stmt = connection_provider.connection
+        let mut stmt = connection_provider
+            .connection
             .prepare(
                 "SELECT count FROM state_vectors
              WHERE mass = 1 AND px = 0 AND py = 0 AND pz = 0 AND vx = 0 AND vy = 0 AND vz = 0;",

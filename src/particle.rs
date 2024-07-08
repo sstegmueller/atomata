@@ -99,7 +99,6 @@ impl Particle {
     }
 }
 
-
 #[derive(Hash, Eq, PartialEq, Debug)]
 pub struct StateVector {
     pub mass: i32,
