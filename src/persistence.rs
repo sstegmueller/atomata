@@ -69,7 +69,7 @@ impl ConnectionProvider for ConnectionProviderImpl {
     }
 }
 
-trait TransactionProvider {
+pub trait TransactionProvider {
     fn prepare(&self, sql: &str) -> Result<Statement>;
     fn commit(self) -> Result<()>;
 }
@@ -98,12 +98,12 @@ pub fn migrate_to_latest(connection_provider: &mut ConnectionProviderImpl) -> Re
     MIGRATIONS.to_latest(&mut connection_provider.connection)
 }
 
-pub fn create_transaction_provider<'a>(
-    connection: &'a mut ConnectionProviderImpl,
-) -> Result<TransactionProviderImpl<'a>, Box<dyn Error>> {
+pub fn create_transaction_provider(
+    connection:  &mut ConnectionProviderImpl,
+) -> Result<TransactionProviderImpl<'_>, Box<dyn Error>> {
     let transaction = connection.transaction()?;
     Ok(TransactionProviderImpl {
-        transaction: transaction,
+        transaction,
     })
 }
 
