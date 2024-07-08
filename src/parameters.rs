@@ -1,5 +1,6 @@
 pub enum Mode {
     Default, // < Default mode with graphical user interface and rendering
+    #[allow(dead_code)]
     Search, // < No graphical user interface and no rendering, only simulation and persistence of data
 }
 
