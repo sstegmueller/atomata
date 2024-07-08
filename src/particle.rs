@@ -104,6 +104,8 @@ impl Particle {
 mod tests {
     use three_d::{Gm, Mesh, PhysicalMaterial};
 
+    use crate::parameters::Mode;
+
     use super::*;
 
     struct MockPositionableRender;
@@ -184,6 +186,7 @@ mod tests {
             max_velocity: 1000.0,
             bucket_size: 1.0,
             database_path: "particles_states.db".to_string(),
+            mode: Mode::Default,
         };
 
         particle.update_position(&parameters);

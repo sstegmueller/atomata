@@ -1,3 +1,8 @@
+pub enum Mode {
+    Default, // < Default mode with graphical user interface and rendering
+    Search, // < No graphical user interface and no rendering, only simulation and persistence of data
+}
+
 pub struct Parameters {
     pub amount: usize,
     pub border: f32,
@@ -10,4 +15,5 @@ pub struct Parameters {
     pub max_velocity: f32,
     pub database_path: String,
     pub bucket_size: f32,
+    pub mode: Mode,
 }
