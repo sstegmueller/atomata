@@ -4,17 +4,159 @@ pub enum Mode {
     Search, // < No graphical user interface and no rendering, only simulation and persistence of data
 }
 
+#[derive(PartialEq, Eq, Clone, Copy, Debug)]
+pub enum InteractionType {
+    Attraction,
+    Repulsion,
+    Neutral,
+}
+
+pub struct ParticleParameters {
+    pub mass: f32,
+    pub index: usize,
+}
+
 pub struct Parameters {
     pub amount: usize,
     pub border: f32,
     pub timestep: f32,
     pub gravity_constant: f32,
-    pub friction: f32,
-    pub mass_red: f32,
-    pub mass_green: f32,
-    pub mass_blue: f32,
+    pub particle_parameters: Vec<ParticleParameters>,
+    pub interactions: Vec<InteractionType>,
     pub max_velocity: f32,
     pub database_path: String,
     pub bucket_size: f32,
     pub mode: Mode,
+}
+
+impl Default for Parameters {
+    fn default() -> Self {
+        Parameters {
+            amount: 10,
+            border: 200.0,
+            timestep: 0.0002,
+            gravity_constant: 1.0,
+            particle_parameters: vec![
+                ParticleParameters {
+                    mass: 3.0,
+                    index: 0,
+                },
+                ParticleParameters {
+                    mass: 250.0,
+                    index: 1,
+                },
+                ParticleParameters {
+                    mass: 10000.0,
+                    index: 2,
+                },
+            ],
+            interactions: vec![
+                InteractionType::Attraction, // 0 <-> 0
+                InteractionType::Attraction, // 1 <-> 0
+                InteractionType::Attraction, // 2 <-> 0
+                InteractionType::Attraction, // 1 <-> 1
+                InteractionType::Attraction, // 1 <-> 2
+                InteractionType::Attraction, // 2 <-> 2
+            ],
+            max_velocity: 20000.0,
+            database_path: "./particles_states.db3".to_string(),
+            bucket_size: 10.0,
+            mode: Mode::Default,
+        }
+    }
+}
+
+impl Parameters {
+    /// Returns the interaction type between two particles given their indices from the
+    /// flat upper triangle interactions matrix.
+    ///
+    /// Example:
+    ///                     Index 0 1 2
+    ///                       0   3 4 5
+    ///  3 4 5 6 7 8  --->    1     6 7   
+    ///                       2       8
+    fn interaction_by_indices(&self, i: usize, j: usize) -> Result<InteractionType, String> {
+        if i > self.particle_parameters.len() || j > self.particle_parameters.len() {
+            return Err("Index out of bounds".to_string());
+        }
+
+        let n = self.particle_parameters.len();
+        let index = i * n + j - i * (i + 1) / 2;
+        Ok(self.interactions[index])
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    pub use super::*;
+
+    #[test]
+    fn test_interaction_by_indices() {
+        let parameters = Parameters {
+            amount: 10,
+            border: 200.0,
+            timestep: 0.0002,
+            gravity_constant: 1.0,
+            particle_parameters: vec![
+                ParticleParameters {
+                    mass: 3.0,
+                    index: 0,
+                },
+                ParticleParameters {
+                    mass: 250.0,
+                    index: 1,
+                },
+                ParticleParameters {
+                    mass: 10000.0,
+                    index: 2,
+                },
+            ],
+            interactions: vec![
+                InteractionType::Attraction, // 0 <-> 0
+                InteractionType::Neutral,    // 1 <-> 0
+                InteractionType::Repulsion,  // 2 <-> 0
+                InteractionType::Neutral,    // 1 <-> 1
+                InteractionType::Attraction, // 1 <-> 2
+                InteractionType::Repulsion,  // 2 <-> 2
+            ],
+            max_velocity: 20000.0,
+            database_path: "./particles_states.db3".to_string(),
+            bucket_size: 10.0,
+            mode: Mode::Default,
+        };
+
+        assert_eq!(
+            parameters.interaction_by_indices(0, 0).unwrap(),
+            InteractionType::Attraction
+        );
+        assert_eq!(
+            parameters.interaction_by_indices(1, 0).unwrap(),
+            InteractionType::Neutral
+        );
+        assert_eq!(
+            parameters.interaction_by_indices(2, 0).unwrap(),
+            InteractionType::Repulsion
+        );
+        assert_eq!(
+            parameters.interaction_by_indices(1, 1).unwrap(),
+            InteractionType::Neutral
+        );
+        assert_eq!(
+            parameters.interaction_by_indices(1, 2).unwrap(),
+            InteractionType::Attraction
+        );
+        assert_eq!(
+            parameters.interaction_by_indices(2, 2).unwrap(),
+            InteractionType::Repulsion
+        );
+
+        assert_eq!(
+            parameters.interaction_by_indices(3, 1).unwrap_err(),
+            "Index out of bounds"
+        );
+        assert_eq!(
+            parameters.interaction_by_indices(1, 3).unwrap_err(),
+            "Index out of bounds"
+        );
+    }
 }

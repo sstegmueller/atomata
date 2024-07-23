@@ -4,7 +4,7 @@ mod particle;
 mod persistence;
 mod sphere;
 
-use parameters::{Mode, Parameters};
+use parameters::{InteractionType, Mode, Parameters, ParticleParameters};
 use particle::Particle;
 #[cfg(not(target_arch = "wasm32"))]
 use persistence::{
@@ -57,23 +57,9 @@ pub fn run() {
     );
     let mut control = OrbitControl::new(*camera.target(), 1.0, 1000.0);
 
-    let mut default_parameters = Parameters {
-        amount: 10,
-        border: 200.0,
-        timestep: 0.0002,
-        gravity_constant: 1.0,
-        friction: 0.005,
-        mass_red: 3.0,
-        mass_green: 250.0,
-        mass_blue: 1000.0,
-        max_velocity: 20000.0,
-        database_path: "./particles_states.db3".to_string(),
-        bucket_size: 10.0,
-        mode: Mode::Default,
-    };
+    let mut default_parameters = Parameters::default();
 
-    let (mut red_particles, mut green_particles, mut blue_particles) =
-        create_particles(&context, &default_parameters);
+    let particles = create_particles(&context, &default_parameters);
     let light0 = DirectionalLight::new(&context, 1.0, Srgba::WHITE, &vec3(0.0, -0.5, -0.5));
     let light1 = DirectionalLight::new(&context, 1.0, Srgba::WHITE, &vec3(0.0, 0.5, 0.5));
 
@@ -89,12 +75,7 @@ pub fn run() {
                 for _ in 0..iterations {
                     let tx_provider =
                         create_transaction_provider(&mut connection_provider).unwrap();
-                    update_particles(
-                        &mut red_particles,
-                        &mut green_particles,
-                        &mut blue_particles,
-                        &default_parameters,
-                    );
+                    update_particles(&mut particles, &default_parameters);
                     for particle in red_particles
                         .iter()
                         .chain(green_particles.iter())
@@ -118,12 +99,7 @@ pub fn run() {
                 camera.set_viewport(frame_input.viewport);
                 control.handle_events(&mut camera, &mut frame_input.events);
 
-                update_particles(
-                    &mut red_particles,
-                    &mut green_particles,
-                    &mut blue_particles,
-                    &default_parameters,
-                );
+                update_particles(&particles, &default_parameters);
 
                 let mut panel_width = 0.0;
                 gui.update(
@@ -199,38 +175,64 @@ pub fn run() {
     }
 }
 
-fn create_particles(
-    context: &Context,
-    parameters: &Parameters,
-) -> (Vec<Particle>, Vec<Particle>, Vec<Particle>) {
-    let red_particles = initialize_particle_kind(
-        context,
-        parameters.border,
-        3.0,
-        Srgba::RED,
-        parameters.amount,
-        parameters.max_velocity,
-    );
-    let green_particles = initialize_particle_kind(
-        context,
-        parameters.border,
-        250.0,
-        Srgba::GREEN,
-        parameters.amount,
-        parameters.max_velocity,
-    );
-    let blue_particles = initialize_particle_kind(
-        context,
-        parameters.border,
-        10000.0,
-        Srgba::BLUE,
-        parameters.amount,
-        parameters.max_velocity,
-    );
-    (red_particles, green_particles, blue_particles)
+fn generate_colors(num_colors: usize) -> Vec<Srgba> {
+    let golden_ratio_conjugate = 0.618033988749895;
+    let mut h = rand::random::<f32>(); // Start with a random hue
+    let mut colors = Vec::with_capacity(num_colors);
+
+    for _ in 0..num_colors {
+        h += golden_ratio_conjugate;
+        h %= 1.0;
+
+        // HSV to RGB conversion
+        let i = (h * 6.0).floor();
+        let f = h * 6.0 - i;
+        let p = 0.95 * (1.0 - 0.5);
+        let q = 0.95 * (1.0 - f * 0.5);
+        let t = 0.95 * (1.0 - (1.0 - f) * 0.5);
+
+        let (r, g, b) = match i as u32 % 6 {
+            0 => (0.95, t, p),
+            1 => (q, 0.95, p),
+            2 => (p, 0.95, t),
+            3 => (p, q, 0.95),
+            4 => (t, p, 0.95),
+            _ => (0.95, p, q),
+        };
+
+        colors.push(Srgba::new(
+            (r * 255.0) as u8,
+            (g * 255.0) as u8,
+            (b * 255.0) as u8,
+            255,
+        ));
+    }
+
+    colors
+}
+
+fn create_particles(context: &Context, parameters: &Parameters) -> Vec<Particle> {
+    let mut particles: Vec<Particle> = Vec::new();
+    let colors = generate_colors(parameters.particle_parameters.len());
+
+    for (particle_params, color) in parameters.particle_parameters.into_iter().zip(colors) {
+        let mut particle_kind = initialize_particle_kind(
+            particle_params.index,
+            context,
+            parameters.border,
+            particle_params.mass,
+            color,
+            parameters.amount,
+            parameters.max_velocity,
+        );
+        particles.append(&mut particle_kind);
+    }
+
+    particles
 }
 
 fn initialize_particle_kind(
+    id: usize,
     context: &Context,
     border: f32,
     mass: f32,
@@ -241,52 +243,19 @@ fn initialize_particle_kind(
     let mut particles = Vec::new();
     for _ in 0..amount {
         let sphere = Sphere::new(context, color);
-        particles.push(Particle::new(Box::new(sphere), border, mass, max_velocity));
+        particles.push(Particle::new(
+            id,
+            Box::new(sphere),
+            border,
+            mass,
+            max_velocity,
+        ));
     }
     particles
 }
 
-fn update_particles(
-    red_particles: &mut Vec<Particle>,
-    green_particles: &mut Vec<Particle>,
-    blue_particles: &mut Vec<Particle>,
-    parameters: &Parameters,
-) {
-    apply_mutual_forces(red_particles, green_particles, parameters.gravity_constant);
-    apply_mutual_forces(red_particles, blue_particles, parameters.gravity_constant);
-    apply_mutual_forces(blue_particles, green_particles, parameters.gravity_constant);
-    apply_identity_forces(red_particles, parameters.gravity_constant);
-    apply_identity_forces(blue_particles, parameters.gravity_constant);
-    apply_identity_forces(green_particles, parameters.gravity_constant);
-
-    for particle in red_particles
-        .iter_mut()
-        .chain(green_particles.iter_mut())
-        .chain(blue_particles.iter_mut())
-    {
-        particle.apply_friction(parameters.friction);
-        particle.update_position(parameters);
-    }
-}
-
-fn apply_mutual_forces(particles_0: &mut Vec<Particle>, particles_1: &mut Vec<Particle>, g: f32) {
-    do_apply_mutual_forces(particles_0, particles_1, g);
-    do_apply_mutual_forces(particles_1, particles_0, g);
-}
-
-fn do_apply_mutual_forces(
-    affected_particles: &mut Vec<Particle>,
-    acting_particles: &Vec<Particle>,
-    g: f32,
-) {
-    for affected_particle in affected_particles {
-        for acting_particle in acting_particles {
-            affected_particle.update_velocity(acting_particle.position, acting_particle.mass, g);
-        }
-    }
-}
-
-fn apply_identity_forces(particles: &mut [Particle], g: f32) {
+fn update_particles(parameters: &Parameters, particles: &mut Vec<Particle>) {
+    let id_clones = particles.iter().map(|p| p.id).collect::<Vec<_>>();
     let postion_clones = particles.iter().map(|p| p.position).collect::<Vec<_>>();
     let mass_clones = particles.iter().map(|p| p.mass).collect::<Vec<_>>();
     let len = particles.len();
@@ -296,6 +265,7 @@ fn apply_identity_forces(particles: &mut [Particle], g: f32) {
                 continue;
             }
             particle.update_velocity(postion_clones[j], mass_clones[j], g);
+            particle.update_position(parameters);
         }
     }
 }
