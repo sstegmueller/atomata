@@ -4,7 +4,7 @@ mod particle;
 mod persistence;
 mod sphere;
 
-use parameters::{InteractionType, Mode, Parameters, ParticleParameters};
+use parameters::{Mode, Parameters};
 use particle::Particle;
 #[cfg(not(target_arch = "wasm32"))]
 use persistence::{
@@ -59,7 +59,7 @@ pub fn run() {
 
     let mut default_parameters = Parameters::default();
 
-    let particles = create_particles(&context, &default_parameters);
+    let mut particles = create_particles(&context, &default_parameters);
     let light0 = DirectionalLight::new(&context, 1.0, Srgba::WHITE, &vec3(0.0, -0.5, -0.5));
     let light1 = DirectionalLight::new(&context, 1.0, Srgba::WHITE, &vec3(0.0, 0.5, 0.5));
 
@@ -75,12 +75,8 @@ pub fn run() {
                 for _ in 0..iterations {
                     let tx_provider =
                         create_transaction_provider(&mut connection_provider).unwrap();
-                    update_particles(&mut particles, &default_parameters);
-                    for particle in red_particles
-                        .iter()
-                        .chain(green_particles.iter())
-                        .chain(blue_particles.iter())
-                    {
+                    update_particles(&mut particles, &default_parameters).unwrap();
+                    for particle in particles.iter() {
                         let state_vector = particle.to_state_vector(default_parameters.bucket_size);
                         persist_state_count(&state_vector, &tx_provider).unwrap();
                     }
@@ -99,7 +95,7 @@ pub fn run() {
                 camera.set_viewport(frame_input.viewport);
                 control.handle_events(&mut camera, &mut frame_input.events);
 
-                update_particles(&particles, &default_parameters);
+                update_particles(&mut particles, &default_parameters).unwrap();
 
                 let mut panel_width = 0.0;
                 gui.update(
@@ -114,11 +110,7 @@ pub fn run() {
                                 Slider::new(&mut default_parameters.amount, 1..=500).text("Amount"),
                             );
                             if ui.button("Reset").clicked() {
-                                let (new_red_particles, new_green_particles, new_blue_particles) =
-                                    create_particles(&context, &default_parameters);
-                                red_particles = new_red_particles;
-                                green_particles = new_green_particles;
-                                blue_particles = new_blue_particles;
+                                particles = create_particles(&context, &default_parameters);
                             };
                             ui.add(
                                 Slider::new(&mut default_parameters.max_velocity, 50.0..=50000.0)
@@ -133,34 +125,16 @@ pub fn run() {
                                     .text("Timestep"),
                             );
                             ui.add(
-                                Slider::new(&mut default_parameters.friction, 0.0..=0.01)
-                                    .text("Friction"),
-                            );
-                            ui.add(
                                 Slider::new(&mut default_parameters.gravity_constant, 0.1..=20.0)
                                     .text("Gravity constant"),
-                            );
-                            ui.add(
-                                Slider::new(&mut default_parameters.mass_red, 1.0..=5000.0)
-                                    .text("Mass Red"),
-                            );
-                            ui.add(
-                                Slider::new(&mut default_parameters.mass_green, 1.0..=5000.0)
-                                    .text("Mass Green"),
-                            );
-                            ui.add(
-                                Slider::new(&mut default_parameters.mass_blue, 1.0..=5000.0)
-                                    .text("Mass Blue"),
                             );
                         });
                         panel_width = gui_context.used_rect().width();
                     },
                 );
 
-                let spheres = red_particles
+                let spheres = particles
                     .iter()
-                    .chain(green_particles.iter())
-                    .chain(blue_particles.iter())
                     .map(|p| p.positionable.get_geometry())
                     .collect::<Vec<_>>();
                 frame_input
@@ -175,8 +149,9 @@ pub fn run() {
     }
 }
 
+/// Generates rgb n rgb color with the maximum possible contrast
 fn generate_colors(num_colors: usize) -> Vec<Srgba> {
-    let golden_ratio_conjugate = 0.618033988749895;
+    let golden_ratio_conjugate = 0.618_034;
     let mut h = rand::random::<f32>(); // Start with a random hue
     let mut colors = Vec::with_capacity(num_colors);
 
@@ -215,7 +190,7 @@ fn create_particles(context: &Context, parameters: &Parameters) -> Vec<Particle>
     let mut particles: Vec<Particle> = Vec::new();
     let colors = generate_colors(parameters.particle_parameters.len());
 
-    for (particle_params, color) in parameters.particle_parameters.into_iter().zip(colors) {
+    for (particle_params, color) in parameters.particle_parameters.iter().zip(colors) {
         let mut particle_kind = initialize_particle_kind(
             particle_params.index,
             context,
@@ -254,7 +229,7 @@ fn initialize_particle_kind(
     particles
 }
 
-fn update_particles(parameters: &Parameters, particles: &mut Vec<Particle>) {
+fn update_particles(particles: &mut [Particle], parameters: &Parameters) -> Result<(), String> {
     let id_clones = particles.iter().map(|p| p.id).collect::<Vec<_>>();
     let postion_clones = particles.iter().map(|p| p.position).collect::<Vec<_>>();
     let mass_clones = particles.iter().map(|p| p.mass).collect::<Vec<_>>();
@@ -264,8 +239,16 @@ fn update_particles(parameters: &Parameters, particles: &mut Vec<Particle>) {
             if i == j {
                 continue;
             }
-            particle.update_velocity(postion_clones[j], mass_clones[j], g);
+            let interaction_type = parameters.interaction_by_indices(particle.id, id_clones[j])?;
+            particle.update_velocity(
+                postion_clones[j],
+                mass_clones[j],
+                interaction_type,
+                parameters.gravity_constant,
+            );
             particle.update_position(parameters);
         }
     }
+
+    Ok(())
 }

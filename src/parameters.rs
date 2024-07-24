@@ -46,17 +46,17 @@ impl Default for Parameters {
                     index: 1,
                 },
                 ParticleParameters {
-                    mass: 10000.0,
+                    mass: 1000.0,
                     index: 2,
                 },
             ],
             interactions: vec![
-                InteractionType::Attraction, // 0 <-> 0
+                InteractionType::Repulsion,  // 0 <-> 0
                 InteractionType::Attraction, // 1 <-> 0
                 InteractionType::Attraction, // 2 <-> 0
-                InteractionType::Attraction, // 1 <-> 1
+                InteractionType::Repulsion,  // 1 <-> 1
                 InteractionType::Attraction, // 1 <-> 2
-                InteractionType::Attraction, // 2 <-> 2
+                InteractionType::Neutral,    // 2 <-> 2
             ],
             max_velocity: 20000.0,
             database_path: "./particles_states.db3".to_string(),
@@ -75,7 +75,7 @@ impl Parameters {
     ///                       0   3 4 5
     ///  3 4 5 6 7 8  --->    1     6 7   
     ///                       2       8
-    fn interaction_by_indices(&self, i: usize, j: usize) -> Result<InteractionType, String> {
+    pub fn interaction_by_indices(&self, i: usize, j: usize) -> Result<InteractionType, String> {
         if i > self.particle_parameters.len() || j > self.particle_parameters.len() {
             return Err("Index out of bounds".to_string());
         }
