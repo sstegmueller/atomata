@@ -144,6 +144,7 @@ mod tests {
     use crate::parameters::{Mode, ParticleParameters};
 
     use super::*;
+    use pretty_assertions_sorted::assert_eq;
 
     struct MockPositionableRender;
 

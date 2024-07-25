@@ -68,23 +68,21 @@ impl Default for Parameters {
 
 impl Parameters {
     /// Returns the interaction type between two particles given their indices from the
-    /// flat upper triangle interactions matrix.
+    /// flat symmetric triangle interactions matrix.
     ///
     /// Example:
     ///                     Index 0 1 2
     ///                       0   3 4 5
-    ///  3 4 5 6 7 8  --->    1     6 7   
-    ///                       2       8
+    ///  3 4 5 6 7 8  --->    1   4 6 7   
+    ///                       2   5 7 8
     pub fn interaction_by_indices(&self, i: usize, j: usize) -> Result<InteractionType, String> {
-        if i > self.particle_parameters.len() - 1 || j > self.particle_parameters.len() - 1 {
+        let num_particle_kinds = self.particle_parameters.len();
+        if i > num_particle_kinds - 1 || j > num_particle_kinds - 1 {
             return Err("Index out of bounds".to_string());
         }
 
-        let mut index = i + j;
-
-        if i > 0 && j > 0 {
-            index = index + 1;
-        }
+        let (i, j) = if i > j { (j, i) } else { (i, j) };
+        let index = (i * (2 * num_particle_kinds - i + 1)) / 2 + (j - i);
 
         Ok(self.interactions[index])
     }
@@ -93,6 +91,7 @@ impl Parameters {
 #[cfg(test)]
 mod tests {
     pub use super::*;
+    use pretty_assertions_sorted::assert_eq;
 
     fn test_parameters() -> Parameters {
         Parameters {
@@ -113,14 +112,22 @@ mod tests {
                     mass: 10000.0,
                     index: 2,
                 },
+                ParticleParameters {
+                    mass: 10000.0,
+                    index: 3,
+                },
             ],
             interactions: vec![
                 InteractionType::Attraction, // 0 <-> 0
                 InteractionType::Neutral,    // 1 <-> 0
                 InteractionType::Repulsion,  // 2 <-> 0
+                InteractionType::Repulsion,  // 3 <-> 0
                 InteractionType::Neutral,    // 1 <-> 1
                 InteractionType::Attraction, // 1 <-> 2
+                InteractionType::Attraction, // 1 <-> 3
                 InteractionType::Repulsion,  // 2 <-> 2
+                InteractionType::Repulsion,  // 2 <-> 3
+                InteractionType::Repulsion,  // 3 <-> 3
             ],
             max_velocity: 20000.0,
             database_path: "./particles_states.db3".to_string(),
@@ -164,12 +171,14 @@ mod tests {
     fn test_interaction_by_indices_failure() {
         let parameters = test_parameters();
 
+        let one_off = parameters.particle_parameters.len();
+
         assert_eq!(
-            parameters.interaction_by_indices(3, 1).unwrap_err(),
+            parameters.interaction_by_indices(one_off, 1).unwrap_err(),
             "Index out of bounds"
         );
         assert_eq!(
-            parameters.interaction_by_indices(1, 3).unwrap_err(),
+            parameters.interaction_by_indices(1, one_off).unwrap_err(),
             "Index out of bounds"
         );
     }
