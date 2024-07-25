@@ -164,7 +164,6 @@ mod tests {
             parameters.interaction_by_indices(2, 2).unwrap(),
             InteractionType::Repulsion
         );
-
     }
 
     #[test]
