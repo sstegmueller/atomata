@@ -108,6 +108,7 @@ pub fn persist_state_count<T: TransactionProvider>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use pretty_assertions_sorted::assert_eq;
 
     fn open_memory_database() -> ConnectionProviderImpl {
         ConnectionProviderImpl {

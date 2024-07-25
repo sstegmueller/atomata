@@ -12,6 +12,7 @@ crate-type = ["cdylib", "rlib"]
 three-d = { version = "0.16.4", features = ["window", "egui-gui"] }
 rand = "=0.8.5"
 lazy_static = "1.4.0"
+pretty_assertions_sorted = "1.2.3"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 rusqlite = { version = "0.31.0", features = [
