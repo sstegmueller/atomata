@@ -21,6 +21,7 @@ pub struct Parameters {
     pub border: f32,
     pub timestep: f32,
     pub gravity_constant: f32,
+    pub friction: f32,
     pub particle_parameters: Vec<ParticleParameters>,
     pub interactions: Vec<InteractionType>,
     pub max_velocity: f32,
@@ -34,6 +35,7 @@ impl Default for Parameters {
         Parameters {
             amount: 10,
             border: 200.0,
+            friction: 0.005,
             timestep: 0.0002,
             gravity_constant: 1.0,
             particle_parameters: vec![

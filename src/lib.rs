@@ -117,6 +117,10 @@ pub fn run() {
                                     .text("Max. velocity"),
                             );
                             ui.add(
+                                Slider::new(&mut default_parameters.friction, 0.0..=0.01)
+                                    .text("Friction"),
+                            );
+                            ui.add(
                                 Slider::new(&mut default_parameters.border, 50.0..=500.0)
                                     .text("Border"),
                             );
@@ -246,6 +250,7 @@ fn update_particles(particles: &mut [Particle], parameters: &Parameters) -> Resu
                 interaction_type,
                 parameters.gravity_constant,
             );
+            particle.apply_friction(parameters.friction);
             particle.update_position(parameters);
         }
     }

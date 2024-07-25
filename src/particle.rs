@@ -79,6 +79,10 @@ impl Particle {
         }
     }
 
+    pub fn apply_friction(&mut self, friction: f32) {
+        self.velocity *= 1.0 - friction;
+    }
+
     pub fn update_position(&mut self, parameters: &Parameters) {
         let mut updated_position = self.compute_updated_position(parameters.timestep);
 
