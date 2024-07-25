@@ -76,12 +76,16 @@ impl Parameters {
     ///  3 4 5 6 7 8  --->    1     6 7   
     ///                       2       8
     pub fn interaction_by_indices(&self, i: usize, j: usize) -> Result<InteractionType, String> {
-        if i > self.particle_parameters.len() || j > self.particle_parameters.len() {
+        if i > self.particle_parameters.len() - 1 || j > self.particle_parameters.len() - 1 {
             return Err("Index out of bounds".to_string());
         }
 
-        let n = self.particle_parameters.len();
-        let index = i * n + j - i * (i + 1) / 2;
+        let mut index = i + j;
+
+        if i > 0 && j > 0 {
+            index = index + 1;
+        }
+
         Ok(self.interactions[index])
     }
 }
@@ -90,9 +94,8 @@ impl Parameters {
 mod tests {
     pub use super::*;
 
-    #[test]
-    fn test_interaction_by_indices() {
-        let parameters = Parameters {
+    fn test_parameters() -> Parameters {
+        Parameters {
             amount: 10,
             border: 200.0,
             timestep: 0.0002,
@@ -123,7 +126,12 @@ mod tests {
             database_path: "./particles_states.db3".to_string(),
             bucket_size: 10.0,
             mode: Mode::Default,
-        };
+        }
+    }
+
+    #[test]
+    fn test_interaction_by_indices_success() {
+        let parameters = test_parameters();
 
         assert_eq!(
             parameters.interaction_by_indices(0, 0).unwrap(),
@@ -149,6 +157,12 @@ mod tests {
             parameters.interaction_by_indices(2, 2).unwrap(),
             InteractionType::Repulsion
         );
+
+    }
+
+    #[test]
+    fn test_interaction_by_indices_failure() {
+        let parameters = test_parameters();
 
         assert_eq!(
             parameters.interaction_by_indices(3, 1).unwrap_err(),
