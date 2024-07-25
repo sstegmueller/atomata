@@ -224,6 +224,7 @@ mod tests {
         };
 
         let parameters = Parameters {
+            friction: 0.0,
             border: 10.0,
             amount: 30,
             timestep: 0.1,

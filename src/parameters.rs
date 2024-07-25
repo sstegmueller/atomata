@@ -99,6 +99,7 @@ mod tests {
         Parameters {
             amount: 10,
             border: 200.0,
+            friction: 0.0,
             timestep: 0.0002,
             gravity_constant: 1.0,
             particle_parameters: vec![

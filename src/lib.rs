@@ -132,6 +132,13 @@ pub fn run() {
                                 Slider::new(&mut default_parameters.gravity_constant, 0.1..=20.0)
                                     .text("Gravity constant"),
                             );
+                            for particle in default_parameters.particle_parameters.iter_mut() {
+                                ui.collapsing(format!("Particle {}", particle.index), |ui| {
+                                    ui.add(
+                                        Slider::new(&mut particle.mass, 1.0..=10000.0).text("Mass"),
+                                    );
+                                });
+                            }
                         });
                         panel_width = gui_context.used_rect().width();
                     },
