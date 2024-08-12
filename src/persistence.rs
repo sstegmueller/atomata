@@ -3,12 +3,44 @@ use rusqlite::{params, Connection, Result, Statement, Transaction};
 use rusqlite_migration::{Migrations, M};
 use std::error::Error;
 
-use crate::particle::StateVector;
+use crate::{parameters::Parameters, particle::StateVector};
 
 lazy_static! {
-    static ref MIGRATIONS: Migrations<'static> =
-        Migrations::new(vec![
-            M::up("CREATE TABLE state_vectors(
+    static ref MIGRATIONS: Migrations<'static> = Migrations::new(vec![
+        M::up(
+            "CREATE TABLE run_parameters (
+                run_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                amount INTEGER NOT NULL,
+                border REAL NOT NULL,
+                timestep REAL NOT NULL,
+                gravity_constant REAL NOT NULL,
+                friction REAL NOT NULL,
+                max_velocity REAL NOT NULL,
+                bucket_size REAL NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );"
+        )
+        .down("DROP TABLE run_parameters;"),
+        M::up(
+            "CREATE TABLE particle_parameters (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                mass REAL NOT NULL,
+                index INTEGER NOT NULL,
+                FOREIGN KEY (run_id) REFERENCES run_parameters(run_id) ON DELETE CASCADE
+            );"
+        )
+        .down("DROP TABLE particle_parameters;"),
+        M::up(
+            "CREATE TABLE interactions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                iteraction_type TEXT NOT NULL,
+                FOREIGN KEY (parameter_id_0) REFERENCES particle_parameters(id) ON DELETE CASCADE
+                FOREIGN KEY (parameter_id_1) REFERENCES particle_parameters(id) ON DELETE CASCADE
+            );"
+        )
+        .down("DROP TABLE interactions;"),
+        M::up(
+            "CREATE TABLE state_vectors(
                  mass INTEGER NOT NULL,
                  px INTEGER NOT NULL,
                  py INTEGER NOT NULL,
@@ -18,13 +50,13 @@ lazy_static! {
                  vz INTEGER NOT NULL,
                  count INTEGER,
                  PRIMARY KEY (mass, px, py, pz, vx, vy, vz)
-               );")
-            .down("DROP TABLE state_vectors;"),
-            // In the future, if the need to change the schema arises, put
-            // migrations here, like so:
-            // M::up("CREATE INDEX UX_friend_email ON friend(email);"),
-            // M::up("CREATE INDEX UX_friend_name ON friend(name);"),
-        ]);
+                 FOREIGN KEY (run_id) REFERENCES run_parameters(run_id) ON DELETE CASCADE
+               );
+               CREATE INDEX idx_state_vectors_run_id ON state_vectors(run_id);
+            "
+        )
+        .down("DROP TABLE state_vectors;"),
+    ]);
 }
 
 trait ConnectionProvider {
@@ -44,6 +76,7 @@ impl ConnectionProvider for ConnectionProviderImpl {
 pub trait TransactionProvider {
     fn prepare(&self, sql: &str) -> Result<Statement>;
     fn commit(self) -> Result<()>;
+    fn get_last_insert_rowid(&self) -> i64;
 }
 
 pub struct TransactionProviderImpl<'a> {
@@ -57,6 +90,10 @@ impl<'a> TransactionProvider for TransactionProviderImpl<'a> {
 
     fn commit(self) -> Result<()> {
         self.transaction.commit()
+    }
+
+    fn get_last_insert_rowid(&self) -> i64 {
+        self.transaction.last_insert_rowid()
     }
 }
 
@@ -105,6 +142,53 @@ pub fn persist_state_count<T: TransactionProvider>(
     Ok(())
 }
 
+pub fn persist_parameters<T: TransactionProvider>(
+    parameters: &Parameters,
+    tx: &T,
+) -> Result<usize, Box<dyn Error>> {
+    let mut stmt = tx.prepare(
+        "INSERT INTO run_parameters (amount, border, timestep, gravity_constant, friction, max_velocity, bucket_size)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7);",
+    )?;
+    stmt.execute(params![
+        parameters.amount,
+        parameters.border,
+        parameters.timestep,
+        parameters.gravity_constant,
+        parameters.friction,
+        parameters.max_velocity,
+        parameters.bucket_size
+    ])?;
+    let parameters_id = tx.get_last_insert_rowid();
+
+    let mut last_particle_id: Option<usize> = None;
+    let mut last_particle_ix: Option<usize> = None;
+    for particle in parameters.particle_parameters.iter() {
+        let mut stmt = tx.prepare(
+            "INSERT INTO particle_parameters (mass, index, run_id)
+             VALUES (?1, ?2, ?3);",
+        )?;
+        stmt.execute(params![particle.mass, particle.index, parameters_id])?;
+
+        let particle_id = tx.get_last_insert_rowid() as usize;
+        if let Some(last_particle_id) = last_particle_id {
+            if let Some(last_particle_ix) = last_particle_ix {
+                let mut stmt = tx.prepare(
+                    "INSERT INTO interactions (interaction_type, parameter_id_0, parameter_id_1)
+                    VALUES (?1, ?2, ?3);",
+                )?;
+                let interaction =
+                    parameters.interaction_by_indices(last_particle_ix, particle.index)?;
+                stmt.execute(params![interaction.to_string(), last_particle_id, particle_id])?;
+            }
+        }
+
+        last_particle_ix = Some(particle.index);
+        last_particle_id = Some(particle_id);
+    }
+    Ok(parameters_id as usize)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -126,7 +210,7 @@ mod tests {
         let mut connection_provider = open_memory_database();
         migrate_to_latest(&mut connection_provider).unwrap();
         let tx_provider = create_transaction_provider(&mut connection_provider).unwrap();
-        let state_vector = StateVector::new(1.0, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0), 10.0);
+        let state_vector = StateVector::new(1.0, (0.0, 0.0, 0.0), (0.0, 0.0, 0.0), 10.0, 1);
         persist_state_count(&state_vector, &tx_provider).unwrap();
         commit_transaction(tx_provider).unwrap();
 

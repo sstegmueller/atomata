@@ -1,3 +1,5 @@
+use std::fmt::{Display, Formatter};
+
 pub enum Mode {
     Default, // < Default mode with graphical user interface and rendering
     #[allow(dead_code)]
@@ -11,6 +13,14 @@ pub enum InteractionType {
     Neutral,
 }
 
+impl Display for InteractionType{
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+
+#[derive(Debug)]
 pub struct ParticleParameters {
     pub mass: f32,
     pub index: usize,
@@ -25,7 +35,6 @@ pub struct Parameters {
     pub particle_parameters: Vec<ParticleParameters>,
     pub interactions: Vec<InteractionType>,
     pub max_velocity: f32,
-    pub database_path: String,
     pub bucket_size: f32,
     pub mode: Mode,
 }
@@ -61,7 +70,6 @@ impl Default for Parameters {
                 InteractionType::Neutral,    // 2 <-> 2
             ],
             max_velocity: 20000.0,
-            database_path: "./particles_states.db3".to_string(),
             bucket_size: 10.0,
             mode: Mode::Default,
         }
@@ -87,6 +95,41 @@ impl Parameters {
         let index = (i * (2 * num_particle_kinds - i + 1)) / 2 + (j - i);
 
         Ok(self.interactions[index])
+    }
+
+    pub fn parameter_space() -> Vec<Self> {
+        vec![Parameters {
+            amount: 10,
+            border: 200.0,
+            friction: 0.005,
+            timestep: 0.0002,
+            gravity_constant: 1.0,
+            particle_parameters: vec![
+                ParticleParameters {
+                    mass: 3.0,
+                    index: 0,
+                },
+                ParticleParameters {
+                    mass: 250.0,
+                    index: 1,
+                },
+                ParticleParameters {
+                    mass: 1000.0,
+                    index: 2,
+                },
+            ],
+            interactions: vec![
+                InteractionType::Repulsion,  // 0 <-> 0
+                InteractionType::Attraction, // 1 <-> 0
+                InteractionType::Attraction, // 2 <-> 0
+                InteractionType::Repulsion,  // 1 <-> 1
+                InteractionType::Attraction, // 1 <-> 2
+                InteractionType::Neutral,    // 2 <-> 2
+            ],
+            max_velocity: 20000.0,
+            bucket_size: 10.0,
+            mode: Mode::Default,
+        }]
     }
 }
 
@@ -133,7 +176,6 @@ mod tests {
                 InteractionType::Repulsion,  // 3 <-> 3
             ],
             max_velocity: 20000.0,
-            database_path: "./particles_states.db3".to_string(),
             bucket_size: 10.0,
             mode: Mode::Default,
         }

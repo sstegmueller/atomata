@@ -1,6 +1,6 @@
 use three_d::{vec3, InnerSpace, Vector3};
 
-use crate::parameters::{InteractionType, Parameters};
+use crate::parameters::{self, InteractionType, Parameters};
 use crate::sphere::PositionableRender;
 
 pub struct Particle {
@@ -97,12 +97,13 @@ impl Particle {
         self.positionable.set_position(self.position);
     }
 
-    pub fn to_state_vector(&self, bucket_size: f32) -> StateVector {
+    pub fn to_state_vector(&self, bucket_size: f32, parameters_id: usize) -> StateVector {
         StateVector::new(
             self.mass,
             (self.position.x, self.position.y, self.position.z),
             (self.velocity.x, self.velocity.y, self.velocity.z),
             bucket_size,
+            parameters_id,
         )
     }
 
@@ -113,6 +114,7 @@ impl Particle {
 
 #[derive(Hash, Eq, PartialEq, Debug)]
 pub struct StateVector {
+    pub parameters_id: usize,
     pub mass: i32,
     pub position_bucket: (i32, i32, i32),
     pub velocity_bucket: (i32, i32, i32),
@@ -124,6 +126,7 @@ impl StateVector {
         position: (f32, f32, f32),
         velocity: (f32, f32, f32),
         bucket_size: f32,
+        parameters_id: usize,
     ) -> Self {
         Self {
             mass: mass as i32,
@@ -137,6 +140,7 @@ impl StateVector {
                 (velocity.1 / bucket_size) as i32,
                 (velocity.2 / bucket_size) as i32,
             ),
+            parameters_id,
         }
     }
 }
@@ -236,7 +240,6 @@ mod tests {
                 index: 0,
             }],
             interactions: vec![InteractionType::Attraction],
-            database_path: "particles_states.db".to_string(),
             mode: Mode::Default,
         };
 

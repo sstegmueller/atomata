@@ -11,6 +11,7 @@ use persistence::{
     commit_transaction, create_transaction_provider, migrate_to_latest, open_database,
     persist_state_count,
 };
+use persistence::{persist_parameters, TransactionProvider};
 use sphere::Sphere;
 use three_d::{
     degrees,
@@ -66,18 +67,23 @@ pub fn run() {
     match default_parameters.mode {
         #[cfg(not(target_arch = "wasm32"))]
         Mode::Search => {
-            let mut connection_provider = open_database(&default_parameters.database_path).unwrap();
-            migrate_to_latest(&mut connection_provider).unwrap();
+            for parameters in Parameters::parameter_space() {
+                let mut connection_provider =
+                    open_database("./results.db3").unwrap();
+                migrate_to_latest(&mut connection_provider).unwrap();
 
-            loop {
+                let tx_provider = create_transaction_provider(&mut connection_provider).unwrap();
+                let parameters_id = persist_parameters(&parameters, &tx_provider).unwrap();
+                tx_provider.commit().unwrap();
+
                 let iterations = 10000;
-
                 for _ in 0..iterations {
                     let tx_provider =
                         create_transaction_provider(&mut connection_provider).unwrap();
-                    update_particles(&mut particles, &default_parameters).unwrap();
+                    update_particles(&mut particles, &parameters).unwrap();
                     for particle in particles.iter() {
-                        let state_vector = particle.to_state_vector(default_parameters.bucket_size);
+                        let state_vector =
+                            particle.to_state_vector(parameters.bucket_size, parameters_id);
                         persist_state_count(&state_vector, &tx_provider).unwrap();
                     }
                     commit_transaction(tx_provider).unwrap();
