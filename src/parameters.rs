@@ -13,12 +13,11 @@ pub enum InteractionType {
     Neutral,
 }
 
-impl Display for InteractionType{
+impl Display for InteractionType {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         write!(f, "{:?}", self)
     }
 }
-
 
 #[derive(Debug)]
 pub struct ParticleParameters {
@@ -130,6 +129,14 @@ impl Parameters {
             bucket_size: 10.0,
             mode: Mode::Default,
         }]
+    }
+
+    fn flat_to_symmetric_triangle_index(
+        flat_index: usize,
+        i: usize,
+        j: usize,
+        num_particle_kinds: usize,
+    ) -> (usize, usize) {
     }
 }
 

@@ -99,7 +99,6 @@ impl Particle {
 
     pub fn to_state_vector(&self, bucket_size: f32, parameters_id: usize) -> StateVector {
         StateVector::new(
-            self.mass,
             (self.position.x, self.position.y, self.position.z),
             (self.velocity.x, self.velocity.y, self.velocity.z),
             bucket_size,
@@ -115,21 +114,18 @@ impl Particle {
 #[derive(Hash, Eq, PartialEq, Debug)]
 pub struct StateVector {
     pub parameters_id: usize,
-    pub mass: i32,
     pub position_bucket: (i32, i32, i32),
     pub velocity_bucket: (i32, i32, i32),
 }
 
 impl StateVector {
     pub fn new(
-        mass: f32,
         position: (f32, f32, f32),
         velocity: (f32, f32, f32),
         bucket_size: f32,
         parameters_id: usize,
     ) -> Self {
         Self {
-            mass: mass as i32,
             position_bucket: (
                 (position.0 / bucket_size) as i32,
                 (position.1 / bucket_size) as i32,
