@@ -13,6 +13,7 @@ three-d = { version = "0.16.4", features = ["window", "egui-gui"] }
 rand = "=0.8.5"
 lazy_static = "1.4.0"
 pretty_assertions_sorted = "1.2.3"
+log = "0.4"
 
 [target.'cfg(target_arch = "x86_64")'.dependencies]
 rusqlite = { version = "0.31.0", features = [
@@ -22,7 +23,6 @@ rusqlite = { version = "0.31.0", features = [
 rusqlite_migration = "1.2.0"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-log = "0.4"
 getrandom = { version = "0.2.12", features = ["js"] }
 wasm-bindgen = "0.2.91"
 wasm-bindgen-futures = "0.4"

@@ -1,5 +1,6 @@
 use std::fmt::{Display, Formatter};
 
+#[derive(Debug)]
 pub enum Mode {
     Default, // < Default mode with graphical user interface and rendering
     #[allow(dead_code)]
@@ -26,6 +27,7 @@ pub struct ParticleParameters {
     pub index: usize,
 }
 
+#[derive(Debug)]
 pub struct Parameters {
     pub amount: usize,
     pub border: f32,
@@ -36,7 +38,6 @@ pub struct Parameters {
     pub interactions: Vec<InteractionType>,
     pub max_velocity: f32,
     pub bucket_size: f32,
-    pub mode: Mode,
 }
 
 impl Default for Parameters {
@@ -74,7 +75,6 @@ impl Default for Parameters {
             ],
             max_velocity: 20000.0,
             bucket_size: 10.0,
-            mode: Mode::Default,
         }
     }
 }
@@ -138,7 +138,6 @@ impl Parameters {
             ],
             max_velocity: 20000.0,
             bucket_size: 10.0,
-            mode: Mode::Default,
         }]
     }
 }
@@ -191,7 +190,6 @@ mod tests {
             ],
             max_velocity: 20000.0,
             bucket_size: 10.0,
-            mode: Mode::Default,
         }
     }
 

@@ -19,6 +19,7 @@ use three_d::{
     vec3, Camera, ClearState, Context, DirectionalLight, FrameOutput, OrbitControl, Srgba, Window,
     WindowSettings,
 };
+use log::info;
 
 // Entry point for wasm
 #[cfg(target_arch = "wasm32")]
@@ -29,8 +30,6 @@ use wasm_bindgen::prelude::*;
 pub fn start() -> Result<(), JsValue> {
     console_log::init_with_level(log::Level::Debug).unwrap();
 
-    use log::info;
-
     info!("Logging works!");
 
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
@@ -40,7 +39,7 @@ pub fn start() -> Result<(), JsValue> {
 
 pub fn run() {
     let window = Window::new(WindowSettings {
-        title: "Shapes!".to_string(),
+        title: "atomata".to_string(),
         max_size: Some((1280, 720)),
         ..Default::default()
     })
@@ -59,17 +58,25 @@ pub fn run() {
     let mut control = OrbitControl::new(*camera.target(), 1.0, 1000.0);
 
     let mut default_parameters = Parameters::default();
+    let mode = Mode::Default;
 
     let mut particles = create_particles(&context, &default_parameters);
     let light0 = DirectionalLight::new(&context, 1.0, Srgba::WHITE, &vec3(0.0, -0.5, -0.5));
     let light1 = DirectionalLight::new(&context, 1.0, Srgba::WHITE, &vec3(0.0, 0.5, 0.5));
 
-    match default_parameters.mode {
+    match mode {
         #[cfg(not(target_arch = "wasm32"))]
         Mode::Search => {
+            info!("Running search mode");
+
+            info!("Initializing database...");
+            let mut connection_provider = open_database("./results.db3").unwrap();
+
+            info!("Migrating database...");
+            migrate_to_latest(&mut connection_provider).unwrap();
+
             for mut parameters in Parameters::parameter_space() {
-                let mut connection_provider = open_database("./results.db3").unwrap();
-                migrate_to_latest(&mut connection_provider).unwrap();
+                info!("Running search for parameters: {:?}", parameters);
 
                 let tx_provider = create_transaction_provider(&mut connection_provider).unwrap();
                 persist_parameters(&mut parameters, &tx_provider).unwrap();

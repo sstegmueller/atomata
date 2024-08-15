@@ -251,7 +251,6 @@ mod tests {
             ],
             max_velocity: 20000.0,
             bucket_size: 10.0,
-            mode: Mode::Default,
         };
         let _ = persist_parameters(&mut parameters, &tx_provider).unwrap();
         commit_transaction(tx_provider).unwrap();
@@ -309,7 +308,6 @@ mod tests {
             ],
             max_velocity: 20000.0,
             bucket_size: 10.0,
-            mode: Mode::Default,
         };
 
         persist_parameters(&mut parameters, &tx_provider).unwrap();
