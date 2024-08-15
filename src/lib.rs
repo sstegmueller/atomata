@@ -8,8 +8,8 @@ use parameters::{Mode, Parameters};
 use particle::Particle;
 #[cfg(not(target_arch = "wasm32"))]
 use persistence::{
-    commit_transaction, create_transaction_provider, migrate_to_latest, open_database,
-    persist_state_count,
+    commit_transaction, create_transaction_provider, increment_state_count, migrate_to_latest,
+    open_database,
 };
 use persistence::{persist_parameters, TransactionProvider};
 use sphere::Sphere;
@@ -67,13 +67,12 @@ pub fn run() {
     match default_parameters.mode {
         #[cfg(not(target_arch = "wasm32"))]
         Mode::Search => {
-            for parameters in Parameters::parameter_space() {
-                let mut connection_provider =
-                    open_database("./results.db3").unwrap();
+            for mut parameters in Parameters::parameter_space() {
+                let mut connection_provider = open_database("./results.db3").unwrap();
                 migrate_to_latest(&mut connection_provider).unwrap();
 
                 let tx_provider = create_transaction_provider(&mut connection_provider).unwrap();
-                let parameters_id = persist_parameters(&parameters, &tx_provider).unwrap();
+                persist_parameters(&mut parameters, &tx_provider).unwrap();
                 tx_provider.commit().unwrap();
 
                 let iterations = 10000;
@@ -82,9 +81,14 @@ pub fn run() {
                         create_transaction_provider(&mut connection_provider).unwrap();
                     update_particles(&mut particles, &parameters).unwrap();
                     for particle in particles.iter() {
+                        let particle_parameter_id = parameters
+                            .particle_parameters_by_index(particle.index)
+                            .unwrap()
+                            .id
+                            .unwrap();
                         let state_vector =
-                            particle.to_state_vector(parameters.bucket_size, parameters_id);
-                        persist_state_count(&state_vector, &tx_provider).unwrap();
+                            particle.to_state_vector(parameters.bucket_size, particle_parameter_id);
+                        increment_state_count(&state_vector, &tx_provider).unwrap();
                     }
                     commit_transaction(tx_provider).unwrap();
                 }
@@ -247,7 +251,7 @@ fn initialize_particle_kind(
 }
 
 fn update_particles(particles: &mut [Particle], parameters: &Parameters) -> Result<(), String> {
-    let id_clones = particles.iter().map(|p| p.id).collect::<Vec<_>>();
+    let id_clones = particles.iter().map(|p| p.index).collect::<Vec<_>>();
     let postion_clones = particles.iter().map(|p| p.position).collect::<Vec<_>>();
     let mass_clones = particles.iter().map(|p| p.mass).collect::<Vec<_>>();
     let len = particles.len();
@@ -256,7 +260,8 @@ fn update_particles(particles: &mut [Particle], parameters: &Parameters) -> Resu
             if i == j {
                 continue;
             }
-            let interaction_type = parameters.interaction_by_indices(particle.id, id_clones[j])?;
+            let interaction_type =
+                parameters.interaction_by_indices(particle.index, id_clones[j])?;
             particle.update_velocity(
                 postion_clones[j],
                 mass_clones[j],

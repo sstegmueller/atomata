@@ -53,7 +53,7 @@ lazy_static! {
                  count INTEGER,
                  particle_parameters_id INTEGER NOT NULL,
                  PRIMARY KEY (px, py, pz, vx, vy, vz, particle_parameters_id),
-                 FOREIGN KEY (particle_parameters_id) REFERENCES particle_parameters(particle_parameters_id) ON DELETE CASCADE
+                 FOREIGN KEY (particle_parameters_id) REFERENCES particle_parameters(id) ON DELETE CASCADE
                );
             "
         )
@@ -122,7 +122,7 @@ pub fn commit_transaction(transaction: TransactionProviderImpl) -> Result<()> {
     transaction.commit()
 }
 
-pub fn persist_state_count<T: TransactionProvider>(
+pub fn increment_state_count<T: TransactionProvider>(
     state_vector: &StateVector,
     tx: &T,
 ) -> Result<(), Box<dyn Error>> {
@@ -139,15 +139,15 @@ pub fn persist_state_count<T: TransactionProvider>(
         state_vector.velocity_bucket.0,
         state_vector.velocity_bucket.1,
         state_vector.velocity_bucket.2,
-        state_vector.parameters_id,
+        state_vector.particle_parameters_id,
     ])?;
     Ok(())
 }
 
 pub fn persist_parameters<T: TransactionProvider>(
-    parameters: &Parameters,
+    parameters: &mut Parameters,
     tx: &T,
-) -> Result<usize, Box<dyn Error>> {
+) -> Result<(), Box<dyn Error>> {
     let mut stmt = tx.prepare(
         "INSERT INTO run_parameters (amount, border, timestep, gravity_constant, friction, max_velocity, bucket_size)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7);",
@@ -163,36 +163,27 @@ pub fn persist_parameters<T: TransactionProvider>(
     ])?;
     let parameters_id = tx.get_last_insert_rowid();
 
-    let mut last_particle_id: Option<usize> = None;
-    let mut last_particle_ix: Option<usize> = None;
-    for particle in parameters.particle_parameters.iter() {
+    for particle in parameters.particle_parameters.iter_mut() {
         let mut stmt = tx.prepare(
             "INSERT INTO particle_parameters (mass, ix, run_id)
              VALUES (?1, ?2, ?3);",
         )?;
         stmt.execute(params![particle.mass, particle.index, parameters_id])?;
 
-        let particle_id = tx.get_last_insert_rowid() as usize;
-        if let Some(last_particle_id) = last_particle_id {
-            if let Some(last_particle_ix) = last_particle_ix {
-                let mut stmt = tx.prepare(
-                    "INSERT INTO interactions (interaction_type, parameter_id_0, parameter_id_1)
-                    VALUES (?1, ?2, ?3);",
-                )?;
-                let interaction =
-                    parameters.interaction_by_indices(last_particle_ix, particle.index)?;
-                stmt.execute(params![
-                    interaction.to_string(),
-                    last_particle_id,
-                    particle_id
-                ])?;
-            }
-        }
-
-        last_particle_ix = Some(particle.index);
-        last_particle_id = Some(particle_id);
+        particle.id = Some(tx.get_last_insert_rowid() as usize);
     }
-    Ok(parameters_id as usize)
+
+    for i in 0..parameters.particle_parameters.len() {
+        for j in i..parameters.particle_parameters.len() {
+            let interaction = parameters.interaction_by_indices(i, j)?;
+            let mut stmt = tx.prepare(
+                "INSERT INTO interactions (interaction_type, parameter_id_0, parameter_id_1)
+                 VALUES (?1, ?2, ?3);",
+            )?;
+            stmt.execute(params![interaction.to_string(), i as i64 + 1, j as i64 + 1])?;
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -218,7 +209,7 @@ mod tests {
         let mut connection_provider = open_memory_database();
         migrate_to_latest(&mut connection_provider).unwrap();
         let tx_provider = create_transaction_provider(&mut connection_provider).unwrap();
-        let parameters = Parameters {
+        let mut parameters = Parameters {
             amount: 10,
             border: 200.0,
             friction: 0.0,
@@ -226,18 +217,22 @@ mod tests {
             gravity_constant: 1.0,
             particle_parameters: vec![
                 ParticleParameters {
+                    id: None,
                     mass: 3.0,
                     index: 0,
                 },
                 ParticleParameters {
+                    id: None,
                     mass: 250.0,
                     index: 1,
                 },
                 ParticleParameters {
+                    id: None,
                     mass: 10000.0,
                     index: 2,
                 },
                 ParticleParameters {
+                    id: None,
                     mass: 10000.0,
                     index: 3,
                 },
@@ -258,7 +253,7 @@ mod tests {
             bucket_size: 10.0,
             mode: Mode::Default,
         };
-        let _ = persist_parameters(&parameters, &tx_provider).unwrap();
+        let _ = persist_parameters(&mut parameters, &tx_provider).unwrap();
         commit_transaction(tx_provider).unwrap();
 
         let mut stmt = connection_provider
@@ -273,23 +268,23 @@ mod tests {
             .prepare("SELECT count(*) FROM particle_parameters;")
             .unwrap();
         let count: i32 = stmt.query_row([], |row| row.get(0)).unwrap();
-        assert_eq!(count, 4);
+        assert_eq!(count, parameters.particle_parameters.len() as i32);
 
         let mut stmt = connection_provider
             .connection
             .prepare("SELECT count(*) FROM interactions;")
             .unwrap();
         let count: i32 = stmt.query_row([], |row| row.get(0)).unwrap();
-        assert_eq!(count, 9);
+        assert_eq!(count, parameters.interactions.len() as i32);
     }
 
     #[test]
-    fn test_persist_state_count() {
+    fn test_increment_state_count() {
         let mut connection_provider = open_memory_database();
         migrate_to_latest(&mut connection_provider).unwrap();
 
         let tx_provider = create_transaction_provider(&mut connection_provider).unwrap();
-        let parameters = Parameters {
+        let mut parameters = Parameters {
             amount: 10,
             border: 200.0,
             friction: 0.0,
@@ -297,10 +292,12 @@ mod tests {
             gravity_constant: 1.0,
             particle_parameters: vec![
                 ParticleParameters {
+                    id: None,
                     mass: 3.0,
                     index: 0,
                 },
                 ParticleParameters {
+                    id: None,
                     mass: 250.0,
                     index: 1,
                 },
@@ -315,10 +312,16 @@ mod tests {
             mode: Mode::Default,
         };
 
-        persist_parameters(&parameters, &tx_provider).unwrap();
+        persist_parameters(&mut parameters, &tx_provider).unwrap();
+        let particle_parameter_id = parameters.particle_parameters[0].id.unwrap();
 
-        let state_vector = StateVector::new((0.0, 0.0, 0.0), (0.0, 0.0, 0.0), 10.0, 0);
-        persist_state_count(&state_vector, &tx_provider).unwrap();
+        let state_vector = StateVector::new(
+            (0.0, 0.0, 0.0),
+            (0.0, 0.0, 0.0),
+            10.0,
+            particle_parameter_id,
+        );
+        increment_state_count(&state_vector, &tx_provider).unwrap();
         commit_transaction(tx_provider).unwrap();
 
         let mut stmt = connection_provider

@@ -1,10 +1,10 @@
 use three_d::{vec3, InnerSpace, Vector3};
 
-use crate::parameters::{self, InteractionType, Parameters};
+use crate::parameters::{InteractionType, Parameters};
 use crate::sphere::PositionableRender;
 
 pub struct Particle {
-    pub id: usize,
+    pub index: usize,
     pub position: Vector3<f32>,
     pub positionable: Box<dyn PositionableRender>,
     pub mass: f32,
@@ -14,7 +14,7 @@ pub struct Particle {
 
 impl Particle {
     pub fn new(
-        id: usize,
+        index: usize,
         mut positionable: Box<dyn PositionableRender>,
         border: f32,
         mass: f32,
@@ -33,7 +33,7 @@ impl Particle {
         let vz = (rand::random::<f32>() - 0.5) * max_velocity;
 
         Self {
-            id,
+            index,
             position,
             velocity: vec3(vx, vy, vz),
             mass,
@@ -97,12 +97,12 @@ impl Particle {
         self.positionable.set_position(self.position);
     }
 
-    pub fn to_state_vector(&self, bucket_size: f32, parameters_id: usize) -> StateVector {
+    pub fn to_state_vector(&self, bucket_size: f32, particle_parameters_id: usize) -> StateVector {
         StateVector::new(
             (self.position.x, self.position.y, self.position.z),
             (self.velocity.x, self.velocity.y, self.velocity.z),
             bucket_size,
-            parameters_id,
+            particle_parameters_id,
         )
     }
 
@@ -113,7 +113,7 @@ impl Particle {
 
 #[derive(Hash, Eq, PartialEq, Debug)]
 pub struct StateVector {
-    pub parameters_id: usize,
+    pub particle_parameters_id: usize,
     pub position_bucket: (i32, i32, i32),
     pub velocity_bucket: (i32, i32, i32),
 }
@@ -123,7 +123,7 @@ impl StateVector {
         position: (f32, f32, f32),
         velocity: (f32, f32, f32),
         bucket_size: f32,
-        parameters_id: usize,
+        particle_parameters_id: usize,
     ) -> Self {
         Self {
             position_bucket: (
@@ -136,7 +136,7 @@ impl StateVector {
                 (velocity.1 / bucket_size) as i32,
                 (velocity.2 / bucket_size) as i32,
             ),
-            parameters_id,
+            particle_parameters_id,
         }
     }
 }
@@ -187,7 +187,7 @@ mod tests {
     #[test]
     fn test_update_velocity() {
         let mut particle = Particle {
-            id: 0,
+            index: 0,
             position: Vector3::new(0.0, 0.0, 0.0),
             positionable: Box::new(MockPositionableRender),
             mass: 1.0,
@@ -215,7 +215,7 @@ mod tests {
     #[test]
     fn test_update_position() {
         let mut particle = Particle {
-            id: 0,
+            index: 0,
             position: Vector3::new(0.0, 0.0, 0.0),
             positionable: Box::new(MockPositionableRender),
             mass: 1.0,
@@ -232,6 +232,7 @@ mod tests {
             max_velocity: 1000.0,
             bucket_size: 1.0,
             particle_parameters: vec![ParticleParameters {
+                id: None,
                 mass: 1.0,
                 index: 0,
             }],
@@ -247,7 +248,7 @@ mod tests {
     #[test]
     fn test_compute_updated_position() {
         let particle = Particle {
-            id: 0,
+            index: 0,
             position: Vector3::new(0.0, 0.0, 0.0),
             positionable: Box::new(MockPositionableRender),
             mass: 1.0,

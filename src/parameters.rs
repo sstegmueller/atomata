@@ -21,6 +21,7 @@ impl Display for InteractionType {
 
 #[derive(Debug)]
 pub struct ParticleParameters {
+    pub id: Option<usize>,
     pub mass: f32,
     pub index: usize,
 }
@@ -48,14 +49,17 @@ impl Default for Parameters {
             gravity_constant: 1.0,
             particle_parameters: vec![
                 ParticleParameters {
+                    id: None,
                     mass: 3.0,
                     index: 0,
                 },
                 ParticleParameters {
+                    id: None,
                     mass: 250.0,
                     index: 1,
                 },
                 ParticleParameters {
+                    id: None,
                     mass: 1000.0,
                     index: 2,
                 },
@@ -96,6 +100,10 @@ impl Parameters {
         Ok(self.interactions[index])
     }
 
+    pub fn particle_parameters_by_index(&self, index: usize) -> Option<&ParticleParameters> {
+        self.particle_parameters.iter().find(|p| p.index == index)
+    }
+
     pub fn parameter_space() -> Vec<Self> {
         vec![Parameters {
             amount: 10,
@@ -105,14 +113,17 @@ impl Parameters {
             gravity_constant: 1.0,
             particle_parameters: vec![
                 ParticleParameters {
+                    id: None,
                     mass: 3.0,
                     index: 0,
                 },
                 ParticleParameters {
+                    id: None,
                     mass: 250.0,
                     index: 1,
                 },
                 ParticleParameters {
+                    id: None,
                     mass: 1000.0,
                     index: 2,
                 },
@@ -130,14 +141,6 @@ impl Parameters {
             mode: Mode::Default,
         }]
     }
-
-    fn flat_to_symmetric_triangle_index(
-        flat_index: usize,
-        i: usize,
-        j: usize,
-        num_particle_kinds: usize,
-    ) -> (usize, usize) {
-    }
 }
 
 #[cfg(test)]
@@ -154,18 +157,22 @@ mod tests {
             gravity_constant: 1.0,
             particle_parameters: vec![
                 ParticleParameters {
+                    id: None,
                     mass: 3.0,
                     index: 0,
                 },
                 ParticleParameters {
+                    id: None,
                     mass: 250.0,
                     index: 1,
                 },
                 ParticleParameters {
+                    id: None,
                     mass: 10000.0,
                     index: 2,
                 },
                 ParticleParameters {
+                    id: None,
                     mass: 10000.0,
                     index: 3,
                 },
