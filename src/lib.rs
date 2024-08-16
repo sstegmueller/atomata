@@ -4,12 +4,13 @@ mod particle;
 mod persistence;
 mod sphere;
 
+use log::info;
 use parameters::{Mode, Parameters};
 use particle::Particle;
 #[cfg(not(target_arch = "wasm32"))]
 use persistence::{
-    commit_transaction, create_transaction_provider, migrate_to_latest, open_database,
-    persist_state_count,
+    commit_transaction, create_transaction_provider, increment_state_count, migrate_to_latest,
+    open_database, persist_parameters, TransactionProvider,
 };
 use sphere::Sphere;
 use three_d::{
@@ -28,8 +29,6 @@ use wasm_bindgen::prelude::*;
 pub fn start() -> Result<(), JsValue> {
     console_log::init_with_level(log::Level::Debug).unwrap();
 
-    use log::info;
-
     info!("Logging works!");
 
     std::panic::set_hook(Box::new(console_error_panic_hook::hook));
@@ -39,7 +38,7 @@ pub fn start() -> Result<(), JsValue> {
 
 pub fn run() {
     let window = Window::new(WindowSettings {
-        title: "Shapes!".to_string(),
+        title: "atomata".to_string(),
         max_size: Some((1280, 720)),
         ..Default::default()
     })
@@ -58,27 +57,44 @@ pub fn run() {
     let mut control = OrbitControl::new(*camera.target(), 1.0, 1000.0);
 
     let mut default_parameters = Parameters::default();
+    let mode = Mode::Default;
 
     let mut particles = create_particles(&context, &default_parameters);
     let light0 = DirectionalLight::new(&context, 1.0, Srgba::WHITE, &vec3(0.0, -0.5, -0.5));
     let light1 = DirectionalLight::new(&context, 1.0, Srgba::WHITE, &vec3(0.0, 0.5, 0.5));
 
-    match default_parameters.mode {
+    match mode {
         #[cfg(not(target_arch = "wasm32"))]
         Mode::Search => {
-            let mut connection_provider = open_database(&default_parameters.database_path).unwrap();
+            info!("Running search mode");
+
+            info!("Initializing database...");
+            let mut connection_provider = open_database("./results.db3").unwrap();
+
+            info!("Migrating database...");
             migrate_to_latest(&mut connection_provider).unwrap();
 
-            loop {
-                let iterations = 10000;
+            for mut parameters in Parameters::parameter_space() {
+                info!("Running search for parameters: {:?}", parameters);
 
+                let tx_provider = create_transaction_provider(&mut connection_provider).unwrap();
+                persist_parameters(&mut parameters, &tx_provider).unwrap();
+                tx_provider.commit().unwrap();
+
+                let iterations = 10000;
                 for _ in 0..iterations {
                     let tx_provider =
                         create_transaction_provider(&mut connection_provider).unwrap();
-                    update_particles(&mut particles, &default_parameters).unwrap();
+                    update_particles(&mut particles, &parameters).unwrap();
                     for particle in particles.iter() {
-                        let state_vector = particle.to_state_vector(default_parameters.bucket_size);
-                        persist_state_count(&state_vector, &tx_provider).unwrap();
+                        let particle_parameter_id = parameters
+                            .particle_parameters_by_index(particle.index)
+                            .unwrap()
+                            .id
+                            .unwrap();
+                        let state_vector =
+                            particle.to_state_vector(parameters.bucket_size, particle_parameter_id);
+                        increment_state_count(&state_vector, &tx_provider).unwrap();
                     }
                     commit_transaction(tx_provider).unwrap();
                 }
@@ -241,7 +257,7 @@ fn initialize_particle_kind(
 }
 
 fn update_particles(particles: &mut [Particle], parameters: &Parameters) -> Result<(), String> {
-    let id_clones = particles.iter().map(|p| p.id).collect::<Vec<_>>();
+    let id_clones = particles.iter().map(|p| p.index).collect::<Vec<_>>();
     let postion_clones = particles.iter().map(|p| p.position).collect::<Vec<_>>();
     let mass_clones = particles.iter().map(|p| p.mass).collect::<Vec<_>>();
     let len = particles.len();
@@ -250,7 +266,8 @@ fn update_particles(particles: &mut [Particle], parameters: &Parameters) -> Resu
             if i == j {
                 continue;
             }
-            let interaction_type = parameters.interaction_by_indices(particle.id, id_clones[j])?;
+            let interaction_type =
+                parameters.interaction_by_indices(particle.index, id_clones[j])?;
             particle.update_velocity(
                 postion_clones[j],
                 mass_clones[j],
