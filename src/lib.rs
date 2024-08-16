@@ -10,9 +10,8 @@ use particle::Particle;
 #[cfg(not(target_arch = "wasm32"))]
 use persistence::{
     commit_transaction, create_transaction_provider, increment_state_count, migrate_to_latest,
-    open_database,
+    open_database, persist_parameters,TransactionProvider,
 };
-use persistence::{persist_parameters, TransactionProvider};
 use sphere::Sphere;
 use three_d::{
     degrees,
