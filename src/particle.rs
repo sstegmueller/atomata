@@ -145,7 +145,7 @@ impl StateVector {
 mod tests {
     use three_d::{Gm, Mesh, PhysicalMaterial};
 
-    use crate::parameters::{Mode, ParticleParameters};
+    use crate::parameters::ParticleParameters;
 
     use super::*;
     use pretty_assertions_sorted::assert_eq;
@@ -237,7 +237,6 @@ mod tests {
                 index: 0,
             }],
             interactions: vec![InteractionType::Attraction],
-            mode: Mode::Default,
         };
 
         particle.update_position(&parameters);

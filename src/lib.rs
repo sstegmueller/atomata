@@ -4,6 +4,7 @@ mod particle;
 mod persistence;
 mod sphere;
 
+use log::info;
 use parameters::{Mode, Parameters};
 use particle::Particle;
 #[cfg(not(target_arch = "wasm32"))]
@@ -19,7 +20,6 @@ use three_d::{
     vec3, Camera, ClearState, Context, DirectionalLight, FrameOutput, OrbitControl, Srgba, Window,
     WindowSettings,
 };
-use log::info;
 
 // Entry point for wasm
 #[cfg(target_arch = "wasm32")]

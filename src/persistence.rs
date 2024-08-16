@@ -188,7 +188,7 @@ pub fn persist_parameters<T: TransactionProvider>(
 
 #[cfg(test)]
 mod tests {
-    use crate::parameters::{InteractionType, Mode, ParticleParameters};
+    use crate::parameters::{InteractionType, ParticleParameters};
 
     use super::*;
     use pretty_assertions_sorted::assert_eq;
