@@ -6,7 +6,7 @@ use crate::sphere::PositionableRender;
 pub struct Particle {
     pub index: usize,
     pub position: Vector3<f32>,
-    pub positionable: Box<dyn PositionableRender>,
+    pub positionable: Option<Box<dyn PositionableRender>>,
     pub mass: f32,
     velocity: Vector3<f32>,
     max_velocity: f32,
@@ -15,7 +15,7 @@ pub struct Particle {
 impl Particle {
     pub fn new(
         index: usize,
-        mut positionable: Box<dyn PositionableRender>,
+        mut positionable: Option<Box<dyn PositionableRender>>,
         border: f32,
         mass: f32,
         max_velocity: f32,
@@ -25,7 +25,10 @@ impl Particle {
         let y = (rand::random::<f32>() - 0.5) * border;
         let z = (rand::random::<f32>() - 0.5) * border;
         let position = vec3(x, y, z);
-        positionable.set_position(position);
+
+        if let Some(positionable) = &mut positionable {
+            positionable.set_position(position);
+        }
 
         // initialize random velocity from 0 top max_velocity
         let vx = (rand::random::<f32>() - 0.5) * max_velocity;
@@ -37,7 +40,7 @@ impl Particle {
             position,
             velocity: vec3(vx, vy, vz),
             mass,
-            positionable,
+            positionable: positionable,
             max_velocity,
         }
     }
@@ -94,7 +97,9 @@ impl Particle {
         }
 
         self.position = updated_position;
-        self.positionable.set_position(self.position);
+        if let Some(positionable) = &mut self.positionable {
+            positionable.set_position(self.position);
+        }
     }
 
     pub fn to_state_vector(&self, bucket_size: f32, particle_parameters_id: usize) -> StateVector {
@@ -169,7 +174,7 @@ mod tests {
         let mass = 1.0;
         let max_velocity = 1000.0;
 
-        let particle = Particle::new(0, positionable, border, mass, max_velocity);
+        let particle = Particle::new(0, Some(positionable), border, mass, max_velocity);
 
         assert_eq!(particle.mass, mass);
 
@@ -189,7 +194,7 @@ mod tests {
         let mut particle = Particle {
             index: 0,
             position: Vector3::new(0.0, 0.0, 0.0),
-            positionable: Box::new(MockPositionableRender),
+            positionable: Some(Box::new(MockPositionableRender)),
             mass: 1.0,
             velocity: Vector3::new(0.0, 0.0, 0.0),
             max_velocity: 1000.0,
@@ -217,7 +222,7 @@ mod tests {
         let mut particle = Particle {
             index: 0,
             position: Vector3::new(0.0, 0.0, 0.0),
-            positionable: Box::new(MockPositionableRender),
+            positionable: Some(Box::new(MockPositionableRender)),
             mass: 1.0,
             velocity: Vector3::new(1.0, 1.0, 1.0),
             max_velocity: 1000.0,
@@ -249,7 +254,7 @@ mod tests {
         let particle = Particle {
             index: 0,
             position: Vector3::new(0.0, 0.0, 0.0),
-            positionable: Box::new(MockPositionableRender),
+            positionable: Some(Box::new(MockPositionableRender)),
             mass: 1.0,
             velocity: Vector3::new(1.0, 1.0, 1.0),
             max_velocity: 1000.0,
