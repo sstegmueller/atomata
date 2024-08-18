@@ -40,7 +40,7 @@ impl Particle {
             position,
             velocity: vec3(vx, vy, vz),
             mass,
-            positionable: positionable,
+            positionable,
             max_velocity,
         }
     }
