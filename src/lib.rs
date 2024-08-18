@@ -4,6 +4,8 @@ mod particle;
 mod persistence;
 mod sphere;
 
+#[cfg(not(target_arch = "wasm32"))]
+use argh::FromArgs;
 use log::info;
 use parameters::{Mode, Parameters};
 use particle::Particle;
@@ -12,13 +14,59 @@ use persistence::{
     commit_transaction, create_transaction_provider, increment_state_count, migrate_to_latest,
     open_database, persist_parameters, TransactionProvider,
 };
-use sphere::Sphere;
+use sphere::{PositionableRender, Sphere};
 use three_d::{
     degrees,
     egui::{SidePanel, Slider},
     vec3, Camera, ClearState, Context, DirectionalLight, FrameOutput, OrbitControl, Srgba, Window,
     WindowSettings,
 };
+
+#[cfg(not(target_arch = "wasm32"))]
+const LOG_FILE_NAME: &str = "atomata.log";
+
+#[cfg(not(target_arch = "wasm32"))]
+#[derive(Debug, FromArgs)]
+#[argh(description = "command line interface arguments")]
+struct Cli {
+    #[argh(
+        switch,
+        short = 's',
+        description = "wheter to run experiements over parameter space in headless mode"
+    )]
+    search: bool,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn set_log_hook(log_file_path: &str) {
+    use log::{error, LevelFilter};
+    use std::{ops::Deref, panic};
+
+    simple_logging::log_to_file(log_file_path, LevelFilter::Info)
+        .expect("Can't initialize logging");
+
+    panic::set_hook(Box::new(|panic_info| {
+        let (filename, line) = panic_info
+            .location()
+            .map(|loc| (loc.file(), loc.line()))
+            .unwrap_or(("<unknown>", 0));
+
+        let cause = panic_info
+            .payload()
+            .downcast_ref::<String>()
+            .map(String::deref);
+
+        let cause = cause.unwrap_or_else(|| {
+            panic_info
+                .payload()
+                .downcast_ref::<&str>()
+                .copied()
+                .unwrap_or("<cause unknown>")
+        });
+
+        error!("A panic occurred at {}:{}: {}", filename, line, cause);
+    }));
+}
 
 // Entry point for wasm
 #[cfg(target_arch = "wasm32")]
@@ -37,37 +85,23 @@ pub fn start() -> Result<(), JsValue> {
 }
 
 pub fn run() {
-    let window = Window::new(WindowSettings {
-        title: "atomata".to_string(),
-        max_size: Some((1280, 720)),
-        ..Default::default()
-    })
-    .unwrap();
-    let context = window.gl();
-
-    let mut camera = Camera::new_perspective(
-        window.viewport(),
-        vec3(5.0, 2.0, 2.5),
-        vec3(0.0, 0.0, -0.5),
-        vec3(0.0, 1.0, 0.0),
-        degrees(45.0),
-        0.1,
-        1000.0,
-    );
-    let mut control = OrbitControl::new(*camera.target(), 1.0, 1000.0);
-
     let mut default_parameters = Parameters::default();
-    let mode = Mode::Default;
 
-    let mut particles = create_particles(&context, &default_parameters);
-    let light0 = DirectionalLight::new(&context, 1.0, Srgba::WHITE, &vec3(0.0, -0.5, -0.5));
-    let light1 = DirectionalLight::new(&context, 1.0, Srgba::WHITE, &vec3(0.0, 0.5, 0.5));
+    #[cfg(not(target_arch = "wasm32"))]
+    let args = argh::from_env::<Cli>();
+    #[cfg(not(target_arch = "wasm32"))]
+    let mode = match args.search {
+        true => Mode::Search,
+        false => Mode::Default,
+    };
+    #[cfg(target_arch = "wasm32")]
+    let mode = Mode::Default;
 
     match mode {
         #[cfg(not(target_arch = "wasm32"))]
         Mode::Search => {
             info!("Running search mode");
-
+            set_log_hook(LOG_FILE_NAME);
             info!("Initializing database...");
             let mut connection_provider = open_database("./results.db3").unwrap();
 
@@ -77,6 +111,7 @@ pub fn run() {
             for mut parameters in Parameters::parameter_space() {
                 info!("Running search for parameters: {:?}", parameters);
 
+                let mut particles = create_particles(None, &default_parameters);
                 let tx_provider = create_transaction_provider(&mut connection_provider).unwrap();
                 persist_parameters(&mut parameters, &tx_provider).unwrap();
                 tx_provider.commit().unwrap();
@@ -106,7 +141,29 @@ pub fn run() {
             // Add appropriate error handling or fallback logic here
         }
         Mode::Default => {
+            let window = Window::new(WindowSettings {
+                title: "atomata".to_string(),
+                max_size: Some((1280, 720)),
+                ..Default::default()
+            })
+            .unwrap();
+            let context = window.gl();
+            let light0 = DirectionalLight::new(&context, 1.0, Srgba::WHITE, &vec3(0.0, -0.5, -0.5));
+            let light1 = DirectionalLight::new(&context, 1.0, Srgba::WHITE, &vec3(0.0, 0.5, 0.5));
+
+            let mut camera = Camera::new_perspective(
+                window.viewport(),
+                vec3(5.0, 2.0, 2.5),
+                vec3(0.0, 0.0, -0.5),
+                vec3(0.0, 1.0, 0.0),
+                degrees(45.0),
+                0.1,
+                1000.0,
+            );
+            let mut control = OrbitControl::new(*camera.target(), 1.0, 1000.0);
             let mut gui = three_d::GUI::new(&context);
+
+            let mut particles = create_particles(Some(&context), &default_parameters);
             window.render_loop(move |mut frame_input| {
                 camera.set_viewport(frame_input.viewport);
                 control.handle_events(&mut camera, &mut frame_input.events);
@@ -126,7 +183,7 @@ pub fn run() {
                                 Slider::new(&mut default_parameters.amount, 1..=500).text("Amount"),
                             );
                             if ui.button("Reset").clicked() {
-                                particles = create_particles(&context, &default_parameters);
+                                particles = create_particles(Some(&context), &default_parameters);
                             };
                             ui.add(
                                 Slider::new(&mut default_parameters.max_velocity, 50.0..=50000.0)
@@ -162,7 +219,7 @@ pub fn run() {
 
                 let spheres = particles
                     .iter()
-                    .map(|p| p.positionable.get_geometry())
+                    .map(|p| p.positionable.as_ref().unwrap().get_geometry())
                     .collect::<Vec<_>>();
                 frame_input
                     .screen()
@@ -213,7 +270,7 @@ fn generate_colors(num_colors: usize) -> Vec<Srgba> {
     colors
 }
 
-fn create_particles(context: &Context, parameters: &Parameters) -> Vec<Particle> {
+fn create_particles(context: Option<&Context>, parameters: &Parameters) -> Vec<Particle> {
     let mut particles: Vec<Particle> = Vec::new();
     let colors = generate_colors(parameters.particle_parameters.len());
 
@@ -235,7 +292,7 @@ fn create_particles(context: &Context, parameters: &Parameters) -> Vec<Particle>
 
 fn initialize_particle_kind(
     id: usize,
-    context: &Context,
+    context: Option<&Context>,
     border: f32,
     mass: f32,
     color: Srgba,
@@ -244,14 +301,14 @@ fn initialize_particle_kind(
 ) -> Vec<Particle> {
     let mut particles = Vec::new();
     for _ in 0..amount {
-        let sphere = Sphere::new(context, color);
-        particles.push(Particle::new(
-            id,
-            Box::new(sphere),
-            border,
-            mass,
-            max_velocity,
-        ));
+        let positionable: Option<Box<dyn PositionableRender>> = match context {
+            Some(context) => {
+                let sphere = Sphere::new(context, color);
+                Some(Box::new(sphere) as Box<dyn PositionableRender>)
+            }
+            None => None,
+        };
+        particles.push(Particle::new(id, positionable, border, mass, max_velocity));
     }
     particles
 }

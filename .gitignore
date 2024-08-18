@@ -1,4 +1,5 @@
 /target
 /web/node_modules
+atomata.log
 results.db3
 results.db3-journal
