@@ -57,7 +57,7 @@ eval("// This is free and unencumbered software released into the public domain.
 /***/ ((module, __unused_webpack_exports, __webpack_require__) => {
 
 "use strict";
-eval("module.exports = __webpack_require__.p + \"02eb4b4cd55dd72a7d30.wasm\";\n\n//# sourceURL=webpack:///./pkg/web_bg.wasm?");
+eval("module.exports = __webpack_require__.p + \"fc87bcbf1434ed401306.wasm\";\n\n//# sourceURL=webpack:///./pkg/web_bg.wasm?");
 
 /***/ }),
 
