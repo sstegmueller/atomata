@@ -3,3 +3,6 @@
 atomata.log
 results.db3
 results.db3-journal
+venv
+.ipynb_checkpoints
+__pycache__
