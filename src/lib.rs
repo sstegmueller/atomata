@@ -4,16 +4,20 @@ mod particle;
 mod persistence;
 mod sphere;
 
+use std::sync::{Arc, Mutex};
+
 #[cfg(not(target_arch = "wasm32"))]
 use argh::FromArgs;
 use log::info;
 use parameters::{Mode, Parameters};
-use particle::Particle;
+use particle::{Particle, StateVector};
 #[cfg(not(target_arch = "wasm32"))]
 use persistence::{
     commit_transaction, create_transaction_provider, increment_state_count, migrate_to_latest,
     open_database, persist_parameters, TransactionProvider,
 };
+#[cfg(not(target_arch = "wasm32"))]
+use rayon::prelude::*;
 use sphere::{PositionableRender, Sphere};
 use three_d::{
     degrees,
@@ -103,37 +107,63 @@ pub fn run() {
             info!("Running search mode");
             set_log_hook(LOG_FILE_NAME);
             info!("Initializing database...");
-            let mut connection_provider = open_database("./results.db3").unwrap();
+            let connection_provider = Arc::new(Mutex::new(open_database("./results.db3").unwrap()));
 
             info!("Migrating database...");
-            migrate_to_latest(&mut connection_provider).unwrap();
-
-            for mut parameters in Parameters::parameter_space() {
-                info!("Running search for parameters: {:?}", parameters);
-
-                let mut particles = create_particles(None, &default_parameters);
-                let tx_provider = create_transaction_provider(&mut connection_provider).unwrap();
-                persist_parameters(&mut parameters, &tx_provider).unwrap();
-                tx_provider.commit().unwrap();
-
-                let iterations = 10000;
-                for _ in 0..iterations {
-                    let tx_provider =
-                        create_transaction_provider(&mut connection_provider).unwrap();
-                    update_particles(&mut particles, &parameters).unwrap();
-                    for particle in particles.iter() {
-                        let particle_parameter_id = parameters
-                            .particle_parameters_by_index(particle.index)
-                            .unwrap()
-                            .id
-                            .unwrap();
-                        let state_vector =
-                            particle.to_state_vector(parameters.bucket_size, particle_parameter_id);
-                        increment_state_count(&state_vector, &tx_provider).unwrap();
-                    }
-                    commit_transaction(tx_provider).unwrap();
-                }
+            {
+                let mut connection = connection_provider.lock().unwrap();
+                migrate_to_latest(&mut connection).unwrap();
             }
+
+            let mut parameter_space = Parameters::parameter_space();
+
+            info!("Persisting parameter space...");
+            {
+                let mut guard = connection_provider.lock().unwrap();
+                let tx_provider = create_transaction_provider(&mut guard).unwrap();
+
+                for parameters in parameter_space.iter_mut() {
+                    persist_parameters(parameters, &tx_provider).unwrap();
+                } 
+
+                tx_provider.commit().unwrap();
+            }
+
+            // Iterate over parameters and perform the search in parallel
+            parameter_space
+                .par_iter()
+                .for_each(|parameters| {
+                    info!("Running search for parameters: {:?}", parameters);
+                    let particles = create_particles(None, &default_parameters);
+
+                    let iterations = 10000;
+
+                    // Perform the computation and persistence for each iteration
+                    for _ in 0..iterations {
+                        let results: Vec<StateVector> = particles
+                            .iter()
+                            .map(|particle| {
+                                let particle_parameter_id = parameters
+                                    .particle_parameters_by_index(particle.index)
+                                    .unwrap()
+                                    .id
+                                    .unwrap();
+                                particle
+                                    .to_state_vector(parameters.bucket_size, particle_parameter_id)
+                            })
+                            .collect();
+
+                        // Persist results sequentially on the main thread
+                        let connection = Arc::clone(&connection_provider);
+                        let mut guard = connection.lock().unwrap();
+                        let tx_provider =
+                            create_transaction_provider(&mut guard).unwrap();
+                        for result in results {
+                            increment_state_count(&result, &tx_provider).unwrap();
+                        }
+                        commit_transaction(tx_provider).unwrap();
+                    }
+                });
         }
         #[cfg(target_arch = "wasm32")]
         Mode::Search => {
