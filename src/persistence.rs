@@ -1,8 +1,7 @@
 use lazy_static::lazy_static;
-use log::info;
-use rusqlite::{params, Connection, OpenFlags, Result, Statement, Transaction};
+use rusqlite::{params, Connection, Result, Statement, Transaction};
 use rusqlite_migration::{Migrations, M};
-use std::{error::Error, thread, time::Duration};
+use std::error::Error;
 
 use crate::{parameters::Parameters, particle::StateVector};
 
@@ -101,14 +100,6 @@ impl<'a> TransactionProvider for TransactionProviderImpl<'a> {
 }
 
 pub fn open_database(path: &str) -> Result<ConnectionProviderImpl> {
-    let connection = Connection::open_with_flags(
-        path,
-        OpenFlags::SQLITE_OPEN_READ_WRITE
-            | OpenFlags::SQLITE_OPEN_CREATE
-            | OpenFlags::SQLITE_OPEN_FULL_MUTEX,
-    )?;
-    connection.busy_timeout(std::time::Duration::from_secs(30))?;
-    connection.pragma_update(None, "journal_mode", "WAL")?;
     Ok(ConnectionProviderImpl {
         connection: Connection::open(path)?,
     })
@@ -127,56 +118,8 @@ pub fn create_transaction_provider(
     Ok(TransactionProviderImpl { transaction })
 }
 
-pub fn transaction_with_retry<F>(conn: &mut ConnectionProviderImpl, mut f: F) -> Result<()>
-where
-    F: FnMut(&TransactionProviderImpl) -> Result<()>,
-{
-    let max_retries = 10;
-    let mut retries = 0;
-
-    loop {
-        match create_transaction_provider(conn).and_then(|tx| {
-            f(&tx)?;
-            tx.commit()
-                .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
-        }) {
-            Ok(_) => return Ok(()),
-            Err(e) => {
-                if let Some(rusqlite::Error::SqliteFailure(error, desc)) = e.downcast_ref() {
-                    if error.code == rusqlite::ErrorCode::DatabaseBusy {
-                        info!("Database is busy, retrying");
-                        retries += 1;
-                        if retries >= max_retries {
-                            return Err(rusqlite::Error::SqliteFailure(
-                                rusqlite::ffi::Error {
-                                    code: rusqlite::ErrorCode::DatabaseBusy,
-                                    extended_code: 0,
-                                },
-                                desc.clone(),
-                            ));
-                        }
-                        thread::sleep(Duration::from_millis(100));
-                    } else {
-                        return Err(rusqlite::Error::SqliteFailure(
-                            rusqlite::ffi::Error {
-                                code: rusqlite::ErrorCode::DatabaseBusy,
-                                extended_code: 0,
-                            },
-                            desc.clone(),
-                        ));
-                    }
-                } else {
-                    return Err(rusqlite::Error::SqliteFailure(
-                        rusqlite::ffi::Error {
-                            code: rusqlite::ErrorCode::DatabaseBusy,
-                            extended_code: 0,
-                        },
-                        Some("Unknown error".to_string()),
-                    ));
-                }
-            }
-        }
-    }
+pub fn commit_transaction(transaction: TransactionProviderImpl) -> Result<()> {
+    transaction.commit()
 }
 
 pub fn increment_state_count<T: TransactionProvider>(

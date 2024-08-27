@@ -11,10 +11,9 @@ use parameters::{Mode, Parameters};
 use particle::Particle;
 #[cfg(not(target_arch = "wasm32"))]
 use persistence::{
-    increment_state_count, migrate_to_latest, open_database, persist_parameters,
-    transaction_with_retry,
+    commit_transaction, create_transaction_provider, increment_state_count, migrate_to_latest,
+    open_database, persist_parameters, TransactionProvider,
 };
-use rayon::prelude::*;
 use sphere::{PositionableRender, Sphere};
 use three_d::{
     degrees,
@@ -104,47 +103,37 @@ pub fn run() {
             info!("Running search mode");
             set_log_hook(LOG_FILE_NAME);
             info!("Initializing database...");
+            let mut connection_provider = open_database("./results.db3").unwrap();
 
             info!("Migrating database...");
-
-            let mut connection_provider = open_database("./results.db3").unwrap();
             migrate_to_latest(&mut connection_provider).unwrap();
 
-            let parameter_space = Parameters::parameter_space();
-            info!("Size of parameter space: {:?}", parameter_space.len());
+            for mut parameters in Parameters::parameter_space() {
+                info!("Running search for parameters: {:?}", parameters);
 
-            Parameters::parameter_space()
-                .into_par_iter()
-                .for_each(|mut parameters| {
-                    info!("Running search for parameters: {:?}", parameters);
+                let mut particles = create_particles(None, &default_parameters);
+                let tx_provider = create_transaction_provider(&mut connection_provider).unwrap();
+                persist_parameters(&mut parameters, &tx_provider).unwrap();
+                tx_provider.commit().unwrap();
 
-                    let mut connection_provider = open_database("./results.db3").unwrap();
-                    let mut particles = create_particles(None, &default_parameters);
-                    transaction_with_retry(&mut connection_provider, |tx_provider| {
-                        persist_parameters(&mut parameters, tx_provider).unwrap();
-                        Ok(())
-                    })
-                    .unwrap();
-
-                    let iterations = 10000;
-                    for _ in 0..iterations {
-                        transaction_with_retry(&mut connection_provider, |tx_provider| {
-                            update_particles(&mut particles, &parameters).unwrap();
-                            for particle in particles.iter() {
-                                let particle_parameter_id = parameters
-                                    .particle_parameters_by_index(particle.index)
-                                    .unwrap()
-                                    .id
-                                    .unwrap();
-                                let state_vector = particle
-                                    .to_state_vector(parameters.bucket_size, particle_parameter_id);
-                                increment_state_count(&state_vector, tx_provider).unwrap();
-                            }
-                            Ok(())
-                        })
-                        .unwrap();
+                let iterations = 10000;
+                for _ in 0..iterations {
+                    let tx_provider =
+                        create_transaction_provider(&mut connection_provider).unwrap();
+                    update_particles(&mut particles, &parameters).unwrap();
+                    for particle in particles.iter() {
+                        let particle_parameter_id = parameters
+                            .particle_parameters_by_index(particle.index)
+                            .unwrap()
+                            .id
+                            .unwrap();
+                        let state_vector =
+                            particle.to_state_vector(parameters.bucket_size, particle_parameter_id);
+                        increment_state_count(&state_vector, &tx_provider).unwrap();
                     }
-                });
+                    commit_transaction(tx_provider).unwrap();
+                }
+            }
         }
         #[cfg(target_arch = "wasm32")]
         Mode::Search => {
