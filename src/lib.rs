@@ -4,21 +4,17 @@ mod particle;
 mod persistence;
 mod sphere;
 
-use std::{
-    os::linux::raw::stat,
-    sync::{Arc, Mutex},
-};
-
 #[cfg(not(target_arch = "wasm32"))]
 use argh::FromArgs;
 use log::info;
 use parameters::{Mode, Parameters};
 use particle::Particle;
-use persistence::create_pool;
 #[cfg(not(target_arch = "wasm32"))]
 use persistence::{
     increment_state_count, migrate_to_latest, open_database, persist_parameters,
+    transaction_with_retry,
 };
+use rayon::prelude::*;
 use sphere::{PositionableRender, Sphere};
 use three_d::{
     degrees,
@@ -107,56 +103,48 @@ pub fn run() {
         Mode::Search => {
             info!("Running search mode");
             set_log_hook(LOG_FILE_NAME);
-            let database_path = "./results.db3";
+            info!("Initializing database...");
 
             info!("Migrating database...");
-            let mut connection_provider = open_database(database_path).unwrap();
+
+            let mut connection_provider = open_database("./results.db3").unwrap();
             migrate_to_latest(&mut connection_provider).unwrap();
 
-            let pool = create_pool(database_path);
-
-            let mut parameter_space = Parameters::parameter_space();
+            let parameter_space = Parameters::parameter_space();
             info!("Size of parameter space: {:?}", parameter_space.len());
 
-            for _ in 0..parameter_space.len() {
-                let pool = pool.clone();
-                let mut parameters = parameter_space.pop().unwrap();
-                let handle = std::thread::spawn(move || {
+            Parameters::parameter_space()
+                .into_par_iter()
+                .for_each(|mut parameters| {
                     info!("Running search for parameters: {:?}", parameters);
 
-                    info!("Persisting parameters...");
-                    let mut particles = create_particles(None, &parameters);
-                    {
-                        let conn = pool.get().unwrap();
-                        persist_parameters(&mut parameters, conn).unwrap();
-                    }
-                    
-                    info!("Running iterations...");
+                    let mut connection_provider = open_database("./results.db3").unwrap();
+                    let mut particles = create_particles(None, &default_parameters);
+                    transaction_with_retry(&mut connection_provider, |tx_provider| {
+                        persist_parameters(&mut parameters, tx_provider).unwrap();
+                        Ok(())
+                    })
+                    .unwrap();
+
                     let iterations = 10000;
-                    for i in 0..iterations {
-                        info!("Iteration: {:?}", i);
-                        info!("Updating particles...");
-                        update_particles(&mut particles, &parameters).unwrap();
-                        info!("Persisting state...");
-                        for particle in particles.iter() {
-                            let particle_parameter_id = parameters
-                                .particle_parameters_by_index(particle.index)
-                                .unwrap()
-                                .id
-                                .unwrap();
-                            let state_vector =
-                                particle.to_state_vector(parameters.bucket_size, particle_parameter_id);
-                            {
-                                info!("Waiting for connection...");
-                                let conn = pool.get().unwrap();
-                                info!("Incrementing state count...");
-                                increment_state_count(&state_vector, conn).unwrap();
+                    for _ in 0..iterations {
+                        transaction_with_retry(&mut connection_provider, |tx_provider| {
+                            update_particles(&mut particles, &parameters).unwrap();
+                            for particle in particles.iter() {
+                                let particle_parameter_id = parameters
+                                    .particle_parameters_by_index(particle.index)
+                                    .unwrap()
+                                    .id
+                                    .unwrap();
+                                let state_vector = particle
+                                    .to_state_vector(parameters.bucket_size, particle_parameter_id);
+                                increment_state_count(&state_vector, tx_provider).unwrap();
                             }
-                        }
+                            Ok(())
+                        })
+                        .unwrap();
                     }
                 });
-                handle.join().unwrap();
-            }
         }
         #[cfg(target_arch = "wasm32")]
         Mode::Search => {

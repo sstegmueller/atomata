@@ -29,7 +29,7 @@
             fontconfig
             wayland
             wasm-pack
-            (rust-bin.beta.latest.default.override {
+            (rust-bin.stable.latest.default.override {
               extensions = [ "rust-src" ];
               targets = [ "wasm32-unknown-unknown" ];
             })

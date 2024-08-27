@@ -1,14 +1,10 @@
 use lazy_static::lazy_static;
 use log::info;
-use r2d2::PooledConnection;
-use r2d2_sqlite::SqliteConnectionManager;
-use rusqlite::{params, Connection, Result, Statement, Transaction};
+use rusqlite::{params, Connection, OpenFlags, Result, Statement, Transaction};
 use rusqlite_migration::{Migrations, M};
 use std::{error::Error, thread, time::Duration};
 
 use crate::{parameters::Parameters, particle::StateVector};
-
-type Pool = r2d2::Pool<SqliteConnectionManager>;
 
 lazy_static! {
     static ref MIGRATIONS: Migrations<'static> = Migrations::new(vec![
@@ -105,18 +101,17 @@ impl<'a> TransactionProvider for TransactionProviderImpl<'a> {
 }
 
 pub fn open_database(path: &str) -> Result<ConnectionProviderImpl> {
-    let connection = Connection::open(
+    let connection = Connection::open_with_flags(
         path,
+        OpenFlags::SQLITE_OPEN_READ_WRITE
+            | OpenFlags::SQLITE_OPEN_CREATE
+            | OpenFlags::SQLITE_OPEN_FULL_MUTEX,
     )?;
     connection.busy_timeout(std::time::Duration::from_secs(30))?;
+    connection.pragma_update(None, "journal_mode", "WAL")?;
     Ok(ConnectionProviderImpl {
         connection: Connection::open(path)?,
     })
-}
-
-pub fn create_pool(path: &str) -> Pool {
-    let manager = SqliteConnectionManager::file(path);
-    r2d2::Pool::builder().max_size(8).build(manager).expect("Failed to create pool")
 }
 
 pub fn migrate_to_latest(
@@ -125,11 +120,70 @@ pub fn migrate_to_latest(
     MIGRATIONS.to_latest(&mut connection_provider.connection)
 }
 
-pub fn increment_state_count(
+pub fn create_transaction_provider(
+    connection: &mut ConnectionProviderImpl,
+) -> Result<TransactionProviderImpl<'_>, Box<dyn Error>> {
+    let transaction = connection.transaction()?;
+    Ok(TransactionProviderImpl { transaction })
+}
+
+pub fn transaction_with_retry<F>(conn: &mut ConnectionProviderImpl, mut f: F) -> Result<()>
+where
+    F: FnMut(&TransactionProviderImpl) -> Result<()>,
+{
+    let max_retries = 10;
+    let mut retries = 0;
+
+    loop {
+        match create_transaction_provider(conn).and_then(|tx| {
+            f(&tx)?;
+            tx.commit()
+                .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)
+        }) {
+            Ok(_) => return Ok(()),
+            Err(e) => {
+                if let Some(rusqlite::Error::SqliteFailure(error, desc)) = e.downcast_ref() {
+                    if error.code == rusqlite::ErrorCode::DatabaseBusy {
+                        info!("Database is busy, retrying");
+                        retries += 1;
+                        if retries >= max_retries {
+                            return Err(rusqlite::Error::SqliteFailure(
+                                rusqlite::ffi::Error {
+                                    code: rusqlite::ErrorCode::DatabaseBusy,
+                                    extended_code: 0,
+                                },
+                                desc.clone(),
+                            ));
+                        }
+                        thread::sleep(Duration::from_millis(100));
+                    } else {
+                        return Err(rusqlite::Error::SqliteFailure(
+                            rusqlite::ffi::Error {
+                                code: rusqlite::ErrorCode::DatabaseBusy,
+                                extended_code: 0,
+                            },
+                            desc.clone(),
+                        ));
+                    }
+                } else {
+                    return Err(rusqlite::Error::SqliteFailure(
+                        rusqlite::ffi::Error {
+                            code: rusqlite::ErrorCode::DatabaseBusy,
+                            extended_code: 0,
+                        },
+                        Some("Unknown error".to_string()),
+                    ));
+                }
+            }
+        }
+    }
+}
+
+pub fn increment_state_count<T: TransactionProvider>(
     state_vector: &StateVector,
-    conn: PooledConnection<SqliteConnectionManager>,
+    tx: &T,
 ) -> Result<(), Box<dyn Error>> {
-    let mut stmt = conn.prepare(
+    let mut stmt = tx.prepare(
         "INSERT INTO state_vectors (px, py, pz, vx, vy, vz, particle_parameters_id, count)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 1)
          ON CONFLICT(px, py, pz, vx, vy, vz, particle_parameters_id)
@@ -147,11 +201,11 @@ pub fn increment_state_count(
     Ok(())
 }
 
-pub fn persist_parameters(
+pub fn persist_parameters<T: TransactionProvider>(
     parameters: &mut Parameters,
-    conn: PooledConnection<SqliteConnectionManager>,
+    tx: &T,
 ) -> Result<(), Box<dyn Error>> {
-    let mut stmt = conn.prepare(
+    let mut stmt = tx.prepare(
         "INSERT INTO run_parameters (amount, border, timestep, gravity_constant, friction, max_velocity, bucket_size)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7);",
     )?;
@@ -164,22 +218,22 @@ pub fn persist_parameters(
         parameters.max_velocity,
         parameters.bucket_size
     ])?;
-    let parameters_id = conn.last_insert_rowid();
+    let parameters_id = tx.get_last_insert_rowid();
 
     for particle in parameters.particle_parameters.iter_mut() {
-        let mut stmt = conn.prepare(
+        let mut stmt = tx.prepare(
             "INSERT INTO particle_parameters (mass, ix, run_id)
              VALUES (?1, ?2, ?3);",
         )?;
         stmt.execute(params![particle.mass, particle.index, parameters_id])?;
 
-        particle.id = Some(conn.last_insert_rowid() as usize);
+        particle.id = Some(tx.get_last_insert_rowid() as usize);
     }
 
     for i in 0..parameters.particle_parameters.len() {
         for j in i..parameters.particle_parameters.len() {
             let interaction = parameters.interaction_by_indices(i, j)?;
-            let mut stmt = conn.prepare(
+            let mut stmt = tx.prepare(
                 "INSERT INTO interactions (interaction_type, parameter_id_0, parameter_id_1)
                  VALUES (?1, ?2, ?3);",
             )?;
