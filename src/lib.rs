@@ -124,47 +124,72 @@ pub fn run() {
 
                 for parameters in parameter_space.iter_mut() {
                     persist_parameters(parameters, &tx_provider).unwrap();
-                } 
+                }
 
                 tx_provider.commit().unwrap();
             }
 
+            let size_parameter_space = parameter_space.len();
+            let counter: Arc<Mutex<i32>> = Arc::new(Mutex::new(0));
+            let average_run_time = Arc::new(Mutex::new(0.0));
+
             // Iterate over parameters and perform the search in parallel
-            parameter_space
-                .par_iter()
-                .for_each(|parameters| {
-                    info!("Running search for parameters: {:?}", parameters);
-                    let mut particles = create_particles(None, &default_parameters);
+            parameter_space.par_iter().for_each(|parameters| {
+                {
+                    let counter = counter.lock().unwrap();
+                    let average_run_time = average_run_time.lock().unwrap();
+                    info!("Run {} / {}", *counter, size_parameter_space);
+                    info!("Average run time: {:.2} s", *average_run_time);
 
-                    let iterations = 10000;
+                    let remaining_time_s =
+                        *average_run_time * (size_parameter_space - *counter as usize) as f64;
+                    // Print in HH:SS format
+                    info!(
+                        "Expected remaining time: {}:{} HH:MM",
+                        (remaining_time_s / 3600.0) as u32,
+                        ((remaining_time_s % 3600.0) / 60.0) as u32
+                    );
+                    info!("Parameters: {:?}", parameters);
+                }
+                let start_time = std::time::Instant::now();
 
-                    // Perform the computation and persistence for each iteration
-                    let mut results: Vec<StateVector> = vec![];
-                    for _ in 0..iterations {
-                        update_particles(&mut particles, &default_parameters).unwrap();
-                        let mut state_vectors = particles
-                            .iter()
-                            .map(|p| {
-                                let particle_parameters_id = parameters
+                let mut particles = create_particles(None, &default_parameters);
+                let iterations = 10000;
+
+                // Perform the computation and persistence for each iteration
+                let mut results: Vec<StateVector> = vec![];
+                for _ in 0..iterations {
+                    update_particles(&mut particles, &default_parameters).unwrap();
+                    let mut state_vectors = particles
+                        .iter()
+                        .map(|p| {
+                            let particle_parameters_id = parameters
                                 .particle_parameters_by_index(p.index)
                                 .unwrap()
                                 .id
-                                .unwrap(); 
-                                p.to_state_vector(parameters.bucket_size, particle_parameters_id)
-                            })
-                            .collect::<Vec<_>>();
-                        results.append(&mut state_vectors);
-                    }
-                    // Persist results sequentially/synchronous on the main thread
-                    let connection = Arc::clone(&connection_provider);
-                    let mut guard = connection.lock().unwrap();
-                    let tx_provider =
-                        create_transaction_provider(&mut guard).unwrap();
-                    for result in results {
-                        increment_state_count(&result, &tx_provider).unwrap();
-                    }
-                    commit_transaction(tx_provider).unwrap();
-                });
+                                .unwrap();
+                            p.to_state_vector(parameters.bucket_size, particle_parameters_id)
+                        })
+                        .collect::<Vec<_>>();
+                    results.append(&mut state_vectors);
+                }
+                // Persist results sequentially/synchronous on the main thread
+                let connection = Arc::clone(&connection_provider);
+                let mut guard = connection.lock().unwrap();
+                let tx_provider = create_transaction_provider(&mut guard).unwrap();
+                for result in results {
+                    increment_state_count(&result, &tx_provider).unwrap();
+                }
+                commit_transaction(tx_provider).unwrap();
+
+                let mut counter = counter.lock().unwrap();
+                *counter += 1;
+
+                let elapsed_time = start_time.elapsed().as_secs_f64();
+                let mut average_run_time = average_run_time.lock().unwrap();
+                *average_run_time =
+                    *average_run_time + (elapsed_time - *average_run_time) / (*counter as f64);
+            });
         }
         #[cfg(target_arch = "wasm32")]
         Mode::Search => {
