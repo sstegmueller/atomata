@@ -134,35 +134,36 @@ pub fn run() {
                 .par_iter()
                 .for_each(|parameters| {
                     info!("Running search for parameters: {:?}", parameters);
-                    let particles = create_particles(None, &default_parameters);
+                    let mut particles = create_particles(None, &default_parameters);
 
                     let iterations = 10000;
 
                     // Perform the computation and persistence for each iteration
+                    let mut results: Vec<StateVector> = vec![];
                     for _ in 0..iterations {
-                        let results: Vec<StateVector> = particles
+                        update_particles(&mut particles, &default_parameters).unwrap();
+                        let mut state_vectors = particles
                             .iter()
-                            .map(|particle| {
-                                let particle_parameter_id = parameters
-                                    .particle_parameters_by_index(particle.index)
-                                    .unwrap()
-                                    .id
-                                    .unwrap();
-                                particle
-                                    .to_state_vector(parameters.bucket_size, particle_parameter_id)
+                            .map(|p| {
+                                let particle_parameters_id = parameters
+                                .particle_parameters_by_index(p.index)
+                                .unwrap()
+                                .id
+                                .unwrap(); 
+                                p.to_state_vector(parameters.bucket_size, particle_parameters_id)
                             })
-                            .collect();
-
-                        // Persist results sequentially on the main thread
-                        let connection = Arc::clone(&connection_provider);
-                        let mut guard = connection.lock().unwrap();
-                        let tx_provider =
-                            create_transaction_provider(&mut guard).unwrap();
-                        for result in results {
-                            increment_state_count(&result, &tx_provider).unwrap();
-                        }
-                        commit_transaction(tx_provider).unwrap();
+                            .collect::<Vec<_>>();
+                        results.append(&mut state_vectors);
                     }
+                    // Persist results sequentially/synchronous on the main thread
+                    let connection = Arc::clone(&connection_provider);
+                    let mut guard = connection.lock().unwrap();
+                    let tx_provider =
+                        create_transaction_provider(&mut guard).unwrap();
+                    for result in results {
+                        increment_state_count(&result, &tx_provider).unwrap();
+                    }
+                    commit_transaction(tx_provider).unwrap();
                 });
         }
         #[cfg(target_arch = "wasm32")]
