@@ -23,6 +23,7 @@ rusqlite = { version = "0.31.0", features = [
     "functions",
 ] }
 rusqlite_migration = "1.2.0"
+rayon = "1.10.0"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.2.12", features = ["js"] }
