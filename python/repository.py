@@ -1,5 +1,6 @@
 import pandas as pd
 
+
 def state_vectors_by_run_id(run_id: int, con):
     return pd.read_sql_query(
         f"""
@@ -8,8 +9,9 @@ def state_vectors_by_run_id(run_id: int, con):
         JOIN run_parameters rp ON pp.run_id = rp.run_id
         WHERE rp.run_id == {run_id}
         """,
-        con
+        con,
     )
+
 
 def total_runs(con) -> int:
     return pd.read_sql_query(
@@ -17,5 +19,15 @@ def total_runs(con) -> int:
         SELECT MAX(run_id)
         FROM run_parameters;
         """,
-        con
+        con,
+    )
+
+
+def parameters_by_run_id(run_id: int, con):
+    return pd.read_sql_query(
+        f"""
+        SELECT * from run_parameters
+        WHERE run_id == {run_id}
+        """,
+        con,
     )

@@ -9,12 +9,12 @@ def empirical_probability(state_count: int, total_count: int) -> float:
     return state_count / total_count
 
 
-def shannon_entropy(probaility_mass: list[float]) -> float:
+def shannon_entropy(probability_mass: list[float]) -> float:
     """
     Calculate the Shannon entropy of a probability mass function.
     The choice of base of the logarithm determines the unit of entropy.
     """
-    return -sum(p * math.log2(p) for p in probaility_mass if p > 0)
+    return -sum(p * math.log2(p) for p in probability_mass if p > 0) / len(probability_mass)
 
 
 def emergence(probaility_mass: list[float]) -> float:
@@ -38,4 +38,7 @@ def complexity(probaility_mass: list[float]) -> float:
     Calculate the complexity of a probability mass function.
     Complexity = emergence * self-organization * a, where a is a constant to bound C to [0,1].
     """
-    return emergence(probaility_mass) * self_organization(probaility_mass) * 4
+    en = shannon_entropy(probaility_mass)
+    emergence = en
+    self_organization = 1 - en
+    return emergence * self_organization * 4
