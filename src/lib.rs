@@ -199,7 +199,6 @@ pub fn run() {
         Mode::Default => {
             let window = Window::new(WindowSettings {
                 title: "atomata".to_string(),
-                max_size: Some((1280, 720)),
                 ..Default::default()
             })
             .unwrap();
@@ -209,13 +208,14 @@ pub fn run() {
 
             let mut camera = Camera::new_perspective(
                 window.viewport(),
-                vec3(5.0, 2.0, 2.5),
-                vec3(0.0, 0.0, -0.5),
+                vec3(150.0, 150.0, 150.0),
+                vec3(0.0, 1.5, 0.0),
                 vec3(0.0, 1.0, 0.0),
                 degrees(45.0),
                 0.1,
                 1000.0,
             );
+
             let mut control = OrbitControl::new(*camera.target(), 1.0, 1000.0);
             let mut gui = three_d::GUI::new(&context);
 
@@ -236,7 +236,8 @@ pub fn run() {
                     frame_input.device_pixel_ratio,
                     |gui_context| {
                         SidePanel::left("side_panel").show(gui_context, |ui| {
-                            ui.heading("Parameters");
+                            ui.heading("atomata");
+                            ui.label("Parameters");
                             ui.add(
                                 Slider::new(&mut default_parameters.amount, 1..=500).text("Amount"),
                             );
@@ -266,6 +267,7 @@ pub fn run() {
                                 Slider::new(&mut default_parameters.gravity_constant, 0.1..=20.0)
                                     .text("Gravity constant"),
                             );
+                            // Current Camera position
                             for particle in default_parameters.particle_parameters.iter_mut() {
                                 ui.collapsing(format!("Particle {}", particle.index), |ui| {
                                     ui.add(
@@ -274,7 +276,13 @@ pub fn run() {
                                 });
                             }
 
-                            ui.label(format!("Iteration step: {}", iteration_step));
+                            ui.label(format!("Iteration step: \n {}", iteration_step));
+                            ui.label(format!(
+                                "Camera position: \n x:{:.1} y: {:.1} z: {:.1}",
+                                camera.position().x,
+                                camera.position().y,
+                                camera.position().z
+                            ));
                         });
                         panel_width = gui_context.used_rect().width();
                     },
