@@ -244,8 +244,11 @@ pub fn run() {
                                 particles = create_particles(Some(&context), &default_parameters);
                             };
                             ui.add(
-                                Slider::new(&mut default_parameters.max_velocity, 0.00001..=50000.0)
-                                    .text("Max. velocity"),
+                                Slider::new(
+                                    &mut default_parameters.max_velocity,
+                                    0.00001..=50000.0,
+                                )
+                                .text("Max. velocity"),
                             );
                             ui.add(
                                 Slider::new(&mut default_parameters.friction, 0.0..=0.01)
