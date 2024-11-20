@@ -290,7 +290,7 @@ pub fn run() {
                     .render(&camera, &spheres, &[&light0, &light1])
                     .write(|| gui.render());
 
-                iteration_step = iteration_step + 1;
+                iteration_step += 1;
                 FrameOutput::default()
             });
         }
