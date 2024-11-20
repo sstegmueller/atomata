@@ -11,9 +11,9 @@ nix develop
 cargo run
 ```
 
-- Build for wasm
+- Build for wasm and serve locally
 ```
-cd web && sh build.sh
+cd web && sh build.sh && npm run serve
 ```
 
 - Analyze search mode results

@@ -44,9 +44,9 @@ impl Default for Parameters {
     fn default() -> Self {
         Parameters {
             amount: 10,
-            border: 200.0,
+            border: 100.0,
             friction: 0.0001,
-            timestep: 0.0002,
+            timestep: 0.0001,
             gravity_constant: 1.0,
             particle_parameters: vec![
                 ParticleParameters {
@@ -73,7 +73,7 @@ impl Default for Parameters {
                 InteractionType::Attraction, // 1 <-> 2
                 InteractionType::Neutral,    // 2 <-> 2
             ],
-            max_velocity: 20000.0,
+            max_velocity: 300.0,
             bucket_size: 10.0,
         }
     }
