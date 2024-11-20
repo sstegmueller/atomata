@@ -2,7 +2,9 @@
 /web/node_modules
 atomata.log
 results.db3
+results.pickle
 results.db3-journal
+.jupyter
 .ipynb_checkpoints
-python
+__pycache__
 venv

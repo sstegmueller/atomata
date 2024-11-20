@@ -219,6 +219,8 @@ pub fn run() {
             let mut control = OrbitControl::new(*camera.target(), 1.0, 1000.0);
             let mut gui = three_d::GUI::new(&context);
 
+            let mut iteration_step = 0;
+
             let mut particles = create_particles(Some(&context), &default_parameters);
             window.render_loop(move |mut frame_input| {
                 camera.set_viewport(frame_input.viewport);
@@ -242,15 +244,18 @@ pub fn run() {
                                 particles = create_particles(Some(&context), &default_parameters);
                             };
                             ui.add(
-                                Slider::new(&mut default_parameters.max_velocity, 50.0..=50000.0)
-                                    .text("Max. velocity"),
+                                Slider::new(
+                                    &mut default_parameters.max_velocity,
+                                    0.00001..=50000.0,
+                                )
+                                .text("Max. velocity"),
                             );
                             ui.add(
                                 Slider::new(&mut default_parameters.friction, 0.0..=0.01)
                                     .text("Friction"),
                             );
                             ui.add(
-                                Slider::new(&mut default_parameters.border, 50.0..=500.0)
+                                Slider::new(&mut default_parameters.border, 0.0001..=500.0)
                                     .text("Border"),
                             );
                             ui.add(
@@ -268,6 +273,8 @@ pub fn run() {
                                     );
                                 });
                             }
+
+                            ui.label(format!("Iteration step: {}", iteration_step));
                         });
                         panel_width = gui_context.used_rect().width();
                     },
@@ -283,6 +290,7 @@ pub fn run() {
                     .render(&camera, &spheres, &[&light0, &light1])
                     .write(|| gui.render());
 
+                iteration_step += 1;
                 FrameOutput::default()
             });
         }

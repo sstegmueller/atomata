@@ -45,7 +45,7 @@ impl Default for Parameters {
         Parameters {
             amount: 10,
             border: 200.0,
-            friction: 0.005,
+            friction: 0.0001,
             timestep: 0.0002,
             gravity_constant: 1.0,
             particle_parameters: vec![
@@ -109,7 +109,7 @@ impl Parameters {
 
         let amounts = vec![10, 100, 500, 1000];
         let borders = vec![400.0, 600.0, 2000.0];
-        let frictions = vec![0.0, 0.005, 0.01];
+        let frictions = vec![0.0, 0.0001, 0.005, 0.01];
         let timesteps = vec![0.0002, 0.0004];
         let gravity_constants = vec![0.5, 1.0, 3.0];
         let max_velocities = vec![20000.0, 40000.0, 60000.0];

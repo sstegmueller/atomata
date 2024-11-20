@@ -52,7 +52,7 @@ lazy_static! {
                  vz INTEGER NOT NULL,
                  count INTEGER,
                  particle_parameters_id INTEGER NOT NULL,
-                 PRIMARY KEY (px, py, pz, vx, vy, vz, particle_parameters_id),
+                 PRIMARY KEY (particle_parameters_id, px, py, pz, vx, vy, vz),
                  FOREIGN KEY (particle_parameters_id) REFERENCES particle_parameters(id) ON DELETE CASCADE
                );
             "
