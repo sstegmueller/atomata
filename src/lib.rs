@@ -244,7 +244,7 @@ pub fn run() {
                                 particles = create_particles(Some(&context), &default_parameters);
                             };
                             ui.add(
-                                Slider::new(&mut default_parameters.max_velocity, 50.0..=50000.0)
+                                Slider::new(&mut default_parameters.max_velocity, 0.00001..=50000.0)
                                     .text("Max. velocity"),
                             );
                             ui.add(
@@ -252,7 +252,7 @@ pub fn run() {
                                     .text("Friction"),
                             );
                             ui.add(
-                                Slider::new(&mut default_parameters.border, 50.0..=500.0)
+                                Slider::new(&mut default_parameters.border, 0.0001..=500.0)
                                     .text("Border"),
                             );
                             ui.add(
