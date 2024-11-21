@@ -1,7 +1,7 @@
 import pandas as pd
 
 
-def state_vectors_by_run_id(run_id: int, con):
+def state_vectors_by_run_id(run_id: int, con) -> pd.DataFrame:
     return pd.read_sql_query(
         f"""
         SELECT sv.px, sv.py, sv.pz, sv.vx, sv.vy, sv.vz, sv.count FROM state_vectors sv
@@ -14,16 +14,17 @@ def state_vectors_by_run_id(run_id: int, con):
 
 
 def total_runs(con) -> int:
-    return pd.read_sql_query(
+    total_runs_df =  pd.read_sql_query(
         """
         SELECT MAX(run_id)
         FROM run_parameters;
         """,
         con,
     )
+    return total_runs_df.iloc[0]["MAX(run_id)"]
 
 
-def parameters_by_run_id(run_id: int, con):
+def parameters_by_run_id(run_id: int, con) -> pd.DataFrame:
     return pd.read_sql_query(
         f"""
         SELECT * from run_parameters
