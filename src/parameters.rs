@@ -112,8 +112,8 @@ impl Parameters {
         let frictions = vec![0.0, 0.0001, 0.005, 0.01];
         let timesteps = vec![0.0002, 0.0004];
         let gravity_constants = vec![0.5, 1.0, 3.0];
-        let max_velocities = vec![20000.0, 40000.0, 60000.0];
-        let bucket_sizes = vec![2.0, 5.0, 10.0, 20.0, 30.0];
+        let max_velocities = vec![1.0, 10.0, 100.0, 1000.0];
+        let bucket_sizes = vec![30.0];
 
         for amount in amounts {
             for border in &borders {
